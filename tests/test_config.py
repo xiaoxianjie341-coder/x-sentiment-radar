@@ -22,7 +22,7 @@ def test_load_settings_defaults_obsidian_contract():
     assert settings.attentionvc_use_rising is True
     assert settings.attentionvc_search_queries == ("anthropic", "openai", "solana")
     assert settings.attentionvc_top_signal_count == 10
-    assert settings.attentionvc_source_mode == "mixed"
+    assert settings.attentionvc_source_mode == "articles_only"
     assert settings.attentionvc_seed_min_views == 1000
     assert settings.attentionvc_article_min_views == 3000
     assert settings.attentionvc_tweet_min_views == 500
