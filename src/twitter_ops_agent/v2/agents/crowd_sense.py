@@ -10,17 +10,18 @@ from twitter_ops_agent.v2.contracts import HydratedSeed
 @dataclass(slots=True)
 class CrowdSenseAgent:
     crowd_context: CrowdContextService
-    signal_min_views: int = 50
-    signal_min_likes: int = 1
-    signal_min_replies: int = 1
+    signal_min_views: int = 0
+    signal_min_likes: int = 0
+    signal_min_replies: int = 0
 
     def run(self, seed: HydratedSeed):
         summary = self.crowd_context.build(tweet_id=seed.seed.tweet_id, seed_text=seed.source_text)
+        signal_limit = max(1, int(getattr(self.crowd_context, "top_signal_count", 10)))
         filtered = [
             signal
             for signal in summary.top_signals
             if not _is_noise_signal(signal, seed, self)
-        ]
+        ][:signal_limit]
         if not filtered:
             return summary
         rebuilt = heuristic_crowd_summary(
@@ -45,10 +46,6 @@ def _is_noise_signal(signal, seed: HydratedSeed, agent: CrowdSenseAgent) -> bool
     if signal.author_handle.lower() in {"grok", "threadreaderapp"}:
         return True
     if "@threadreaderapp" in text or "unroll" in text:
-        return True
-    if signal.views < agent.signal_min_views:
-        return True
-    if signal.likes < agent.signal_min_likes and signal.replies < agent.signal_min_replies:
         return True
     normalized = " ".join(signal.text.split())
     if len(normalized) < 24:

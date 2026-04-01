@@ -57,6 +57,8 @@ attentionvc_tweet_min_likes = 10
 attentionvc_tweet_min_replies = 3
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
-attentionvc_signal_min_views = 100
-attentionvc_signal_min_likes = 1
-attentionvc_signal_min_replies = 1
+# Keep low-engagement replies if they contain real discussion. These are retained
+# for compatibility but default to 0 so first-time installs do not hard-filter.
+attentionvc_signal_min_views = 0
+attentionvc_signal_min_likes = 0
+attentionvc_signal_min_replies = 0

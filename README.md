@@ -82,9 +82,9 @@ attentionvc_tweet_min_replies = 3
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
 
-attentionvc_signal_min_views = 100
-attentionvc_signal_min_likes = 2
-attentionvc_signal_min_replies = 2
+attentionvc_signal_min_views = 0
+attentionvc_signal_min_likes = 0
+attentionvc_signal_min_replies = 0
 ```
 
 ### 配置含义
@@ -107,7 +107,10 @@ attentionvc_signal_min_replies = 2
   - 每个主题最多抓 100 条回复样本
 
 - `attentionvc_top_signal_count = 10`
-  - 最后输出前 10 条高信号评论
+  - 默认输出前 10 条评论，并在笔记里按情绪分组展示
+
+- `attentionvc_signal_min_* = 0`
+  - 默认不按最低浏览 / 最低点赞硬过滤评论，避免把低互动但有价值的回复提前筛掉
 
 ### 关于 AttentionVC
 
@@ -133,6 +136,7 @@ attentionvc_signal_min_replies = 2
 - 回复分页抓取
 - 每个主题最多抓 100 条回复样本
 - 写入 `雷达 / 主题参考 / 可借用观点`
+- 主题参考页里默认展示 10 条评论，并按情绪分组
 - 雷达页里可直接点原推文
 
 还在继续优化：
@@ -225,9 +229,9 @@ attentionvc_tweet_min_replies = 3
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
 
-attentionvc_signal_min_views = 100
-attentionvc_signal_min_likes = 2
-attentionvc_signal_min_replies = 2
+attentionvc_signal_min_views = 0
+attentionvc_signal_min_likes = 0
+attentionvc_signal_min_replies = 0
 ```
 
 ### What These Settings Mean
@@ -250,7 +254,10 @@ attentionvc_signal_min_replies = 2
   - fetch up to 100 reply samples per topic
 
 - `attentionvc_top_signal_count = 10`
-  - keep the top 10 final signals
+  - keep 10 comments by default and show them grouped by audience emotion in the note
+
+- `attentionvc_signal_min_* = 0`
+  - do not hard-filter low-engagement replies by default, so sparse but useful comments still survive
 
 ### AttentionVC Reality
 
@@ -276,6 +283,7 @@ Already working:
 - reply pagination
 - up to 100 reply samples per topic
 - radar / topic / viewpoint pages in Obsidian
+- top 10 comments grouped by emotion inside topic notes
 - source links in radar
 
 Still improving:

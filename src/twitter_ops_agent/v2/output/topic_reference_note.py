@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from twitter_ops_agent.research.crowd_context import group_signals_by_emotion, summarize_signal_emotions
 from twitter_ops_agent.v2.contracts import TopicWorkspaceItem
+
+MAX_RENDERED_SIGNALS = 10
 
 
 def render_topic_reference_note(item: TopicWorkspaceItem) -> str:
@@ -20,11 +23,17 @@ def render_topic_reference_note(item: TopicWorkspaceItem) -> str:
 ## 当前主情绪
 {item.dominant_emotion}
 
+## 情绪分布
+{_render_emotion_distribution(item)}
+
 ## 主要分歧点
 {item.primary_tension}
 
 ## 高质量评论
 {_render_top_signals(item)}
+
+## 按情绪分类看评论
+{_render_grouped_signals(item)}
 
 ## 可继续研究的方向
 {_render_lines(item.research_directions)}
@@ -39,13 +48,42 @@ def _render_top_signals(item: TopicWorkspaceItem) -> str:
     if not item.crowd_summary.top_signals:
         return "- 暂无稳定高信号评论\n"
     lines: list[str] = []
-    for index, signal in enumerate(item.crowd_summary.top_signals[:5], start=1):
+    for index, signal in enumerate(item.crowd_summary.top_signals[:MAX_RENDERED_SIGNALS], start=1):
         lines.append(
             f"- {index}. @{signal.author_handle} | 赞 {signal.likes} | 回 {signal.replies} | 浏览 {signal.views}\n"
             f"  {signal.text}\n"
             f"  {signal.url}"
         )
     return "\n".join(lines) + "\n"
+
+
+def _render_emotion_distribution(item: TopicWorkspaceItem) -> str:
+    counts = summarize_signal_emotions(item.crowd_summary.top_signals[:MAX_RENDERED_SIGNALS])
+    lines = [f"- 主要情绪：{item.dominant_emotion}"]
+    for label, count in counts.items():
+        lines.append(f"- {label}：{count}")
+    return "\n".join(lines) + "\n"
+
+
+def _render_grouped_signals(item: TopicWorkspaceItem) -> str:
+    if not item.crowd_summary.top_signals:
+        return "- 暂无可分组评论\n"
+
+    sections: list[str] = []
+    for label, signals in group_signals_by_emotion(item.crowd_summary.top_signals[:MAX_RENDERED_SIGNALS]):
+        sections.append(f"### {label}（{len(signals)}）")
+        if not signals:
+            sections.append("- 暂无")
+            sections.append("")
+            continue
+        for signal in signals:
+            sections.append(
+                f"- @{signal.author_handle} | 赞 {signal.likes} | 回 {signal.replies} | 浏览 {signal.views}\n"
+                f"  {signal.text}\n"
+                f"  {signal.url}"
+            )
+        sections.append("")
+    return "\n".join(sections).rstrip() + "\n"
 
 
 def _render_lines(values: tuple[str, ...]) -> str:

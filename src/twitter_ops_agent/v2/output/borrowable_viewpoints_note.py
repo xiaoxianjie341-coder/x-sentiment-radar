@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from twitter_ops_agent.v2.contracts import TopicWorkspaceItem
 
+MAX_RENDERED_SIGNALS = 10
+
 
 def render_borrowable_viewpoints_note(item: TopicWorkspaceItem) -> str:
     return f"""# {item.title}
@@ -26,7 +28,7 @@ def _render_top_signals(item: TopicWorkspaceItem) -> str:
         return "- 暂无\n"
     return "".join(
         f"- @{signal.author_handle}：{signal.text}\n  {signal.url}\n"
-        for signal in item.crowd_summary.top_signals[:5]
+        for signal in item.crowd_summary.top_signals[:MAX_RENDERED_SIGNALS]
     )
 
 

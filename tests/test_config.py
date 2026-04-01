@@ -24,8 +24,11 @@ def test_load_settings_defaults_obsidian_contract():
     assert settings.attentionvc_top_signal_count == 10
     assert settings.attentionvc_source_mode == "articles_only"
     assert settings.attentionvc_seed_min_views == 1000
-    assert settings.attentionvc_article_min_views == 3000
+    assert settings.attentionvc_article_min_views == 2000
     assert settings.attentionvc_tweet_min_views == 500
+    assert settings.attentionvc_signal_min_views == 0
+    assert settings.attentionvc_signal_min_likes == 0
+    assert settings.attentionvc_signal_min_replies == 0
 
 
 def test_load_settings_example_config_resolves_repo_relative_paths():

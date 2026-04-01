@@ -7,38 +7,55 @@ from twitter_ops_agent.discovery.attentionvc import AttentionTweet, AttentionVCA
 from twitter_ops_agent.domain.models import CrowdSignal, CrowdSummary
 from twitter_ops_agent.writer.llm_writer import LLMWriterConfig, call_openai_compatible_api
 
+SKEPTICAL_MARKERS = ("scam", "fake", "cope", "doubt", "why", "risk", "质疑", "怀疑", "割", "泡沫", "风险")
+FEAR_MARKERS = ("fear", "panic", "dump", "crash", "bear", "担心", "恐慌", "暴跌", "害怕")
+POSITIVE_MARKERS = ("bull", "long", "buy", "good", "great", "alpha", "机会", "看多", "利好", "牛", "冲")
+EMOTION_ORDER = ("质疑/求证", "担忧/风险", "兴奋/机会", "中性/信息补充")
+
 
 @dataclass(slots=True)
 class CrowdContextService:
     client: AttentionVCArticleClient
     reply_sample_limit: int = 20
-    top_signal_count: int = 5
+    top_signal_count: int = 10
     search_fallback_limit: int = 8
     summarizer: object | None = None
 
     def build(self, *, tweet_id: str, seed_text: str) -> CrowdSummary:
         thread = self.client.tweet_thread(tweet_id=tweet_id)
         replies = self.client.tweet_replies(tweet_id=tweet_id, limit=self.reply_sample_limit)
-        source_label = "评论区"
-        signals = _rank_signals(replies, limit=self.top_signal_count, source_type="reply")
+        source_labels: list[str] = []
+        candidate_limit = max(self.top_signal_count * 3, 20)
+        signals = _rank_signals(replies, limit=candidate_limit, source_type="reply")
+        if signals:
+            source_labels.append("评论区")
 
-        if not signals:
-            thread_replies = [tweet for tweet in thread if tweet.tweet_id != tweet_id]
-            signals = _rank_signals(thread_replies, limit=self.top_signal_count, source_type="thread")
-            source_label = "作者线程"
+        thread_replies = [tweet for tweet in thread if tweet.tweet_id != tweet_id]
+        if len(signals) < self.top_signal_count and thread_replies:
+            thread_signals = _rank_signals(thread_replies, limit=candidate_limit, source_type="thread")
+            signals = _merge_signals(signals, thread_signals, limit=candidate_limit)
+            if thread_signals:
+                source_labels.append("作者线程")
 
-        if not signals:
+        if len(signals) < self.top_signal_count:
             fallback_query = build_search_query(seed_text)
             related = _filter_related_discussion(
                 seed_text=seed_text,
                 tweets=[
                     tweet
-                    for tweet in self.client.search_tweets(query=fallback_query, limit=self.search_fallback_limit)
+                    for tweet in self.client.search_tweets(
+                        query=fallback_query,
+                        limit=max(self.search_fallback_limit, candidate_limit),
+                    )
                     if tweet.tweet_id != tweet_id
                 ],
             )
-            signals = _rank_signals(related, limit=self.top_signal_count, source_type="discussion")
-            source_label = "相关讨论"
+            related_signals = _rank_signals(related, limit=candidate_limit, source_type="discussion")
+            signals = _merge_signals(signals, related_signals, limit=candidate_limit)
+            if related_signals:
+                source_labels.append("相关讨论")
+
+        source_label = " + ".join(dict.fromkeys(source_labels)) or "评论区"
 
         if self.summarizer is not None and signals:
             try:
@@ -130,19 +147,10 @@ def heuristic_crowd_summary(
             source_label=source_label,
         )
 
-    positive_markers = ("bull", "long", "buy", "good", "great", "alpha", "机会", "看多", "利好", "牛", "冲")
-    skeptical_markers = ("scam", "fake", "cope", "doubt", "why", "risk", "质疑", "怀疑", "割", "泡沫", "风险")
-    fear_markers = ("fear", "panic", "dump", "crash", "bear", "担心", "恐慌", "暴跌", "害怕")
-
-    positive = skeptical = fear = 0
-    for signal in signals:
-        lowered = signal.text.lower()
-        if any(token in lowered for token in positive_markers):
-            positive += 1
-        if any(token in lowered for token in skeptical_markers):
-            skeptical += 1
-        if any(token in lowered for token in fear_markers):
-            fear += 1
+    emotion_counts = summarize_signal_emotions(signals)
+    skeptical = emotion_counts["质疑/求证"]
+    fear = emotion_counts["担忧/风险"]
+    positive = emotion_counts["兴奋/机会"]
 
     if skeptical >= positive and skeptical >= fear:
         mood = "评论区更偏质疑和求证，大家不是没兴趣，而是对信息可信度和后续兑现更敏感。"
@@ -208,8 +216,57 @@ def _rank_signals(
                 source_type=source_type,
             )
         )
-    ranked.sort(key=lambda item: (item.signal_score, item.likes, item.replies, item.views), reverse=True)
+    ranked.sort(key=lambda item: (item.views, item.likes, item.replies, item.bookmarks, item.signal_score), reverse=True)
     return ranked[:limit]
+
+
+def classify_signal_emotion(text: str) -> str:
+    lowered = text.lower()
+    skeptical_score = sum(1 for token in SKEPTICAL_MARKERS if token in lowered)
+    fear_score = sum(1 for token in FEAR_MARKERS if token in lowered)
+    positive_score = sum(1 for token in POSITIVE_MARKERS if token in lowered)
+
+    if skeptical_score >= fear_score and skeptical_score >= positive_score and skeptical_score > 0:
+        return "质疑/求证"
+    if fear_score >= positive_score and fear_score > 0:
+        return "担忧/风险"
+    if positive_score > 0:
+        return "兴奋/机会"
+    return "中性/信息补充"
+
+
+def summarize_signal_emotions(signals: list[CrowdSignal] | tuple[CrowdSignal, ...]) -> dict[str, int]:
+    counts = {label: 0 for label in EMOTION_ORDER}
+    for signal in signals:
+        counts[classify_signal_emotion(signal.text)] += 1
+    return counts
+
+
+def group_signals_by_emotion(
+    signals: list[CrowdSignal] | tuple[CrowdSignal, ...],
+) -> tuple[tuple[str, tuple[CrowdSignal, ...]], ...]:
+    grouped: dict[str, list[CrowdSignal]] = {label: [] for label in EMOTION_ORDER}
+    for signal in signals:
+        grouped[classify_signal_emotion(signal.text)].append(signal)
+    return tuple((label, tuple(grouped[label])) for label in EMOTION_ORDER)
+
+
+def _merge_signals(
+    primary: list[CrowdSignal],
+    secondary: list[CrowdSignal],
+    *,
+    limit: int,
+) -> list[CrowdSignal]:
+    merged: list[CrowdSignal] = []
+    seen_ids: set[str] = set()
+    for signal in [*primary, *secondary]:
+        if signal.tweet_id in seen_ids:
+            continue
+        seen_ids.add(signal.tweet_id)
+        merged.append(signal)
+        if len(merged) >= limit:
+            break
+    return merged
 
 
 def _compress_signal_text(text: str) -> str:

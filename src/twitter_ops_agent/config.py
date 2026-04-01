@@ -106,9 +106,9 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "attentionvc_tweet_min_replies": 3,
         "attentionvc_reply_sample_limit": 100,
         "attentionvc_top_signal_count": 10,
-        "attentionvc_signal_min_views": 100,
-        "attentionvc_signal_min_likes": 1,
-        "attentionvc_signal_min_replies": 1,
+        "attentionvc_signal_min_views": 0,
+        "attentionvc_signal_min_likes": 0,
+        "attentionvc_signal_min_replies": 0,
     }
 
     if config_path is not None:

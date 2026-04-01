@@ -9,6 +9,22 @@ from twitter_ops_agent.v2.output.radar_note import render_radar_note
 from twitter_ops_agent.v2.output.topic_reference_note import render_topic_reference_note
 
 
+def _signal(index: int, text: str, *, likes: int = 0, replies: int = 0, views: int = 0) -> CrowdSignal:
+    return CrowdSignal(
+        tweet_id=f"reply-{index}",
+        author_handle=f"user{index}",
+        author_name=f"User {index}",
+        text=text,
+        url=f"https://x.com/user{index}/status/{index}",
+        likes=likes,
+        replies=replies,
+        views=views,
+        bookmarks=index,
+        signal_score=float(100 - index),
+        source_type="reply",
+    )
+
+
 def _item() -> TopicWorkspaceItem:
     return TopicWorkspaceItem(
         event_id="event-1",
@@ -27,19 +43,16 @@ def _item() -> TopicWorkspaceItem:
             key_points=("很多人质疑这是不是刻意放出来的。", "也有人觉得真正重点是开发者对 Claude Code 内部实现的兴趣。"),
             suggested_angles=("可以从『失误』和『工程能力暴露』的张力切入。",),
             top_signals=(
-                CrowdSignal(
-                    tweet_id="reply-1",
-                    author_handle="builder01",
-                    author_name="Builder",
-                    text="The real story is not the leak. It's that devs want to see how these tools are actually built.",
-                    url="https://x.com/builder01/status/1",
-                    likes=88,
-                    replies=12,
-                    views=5000,
-                    bookmarks=9,
-                    signal_score=99.0,
-                    source_type="reply",
-                ),
+                _signal(1, "This feels fake and people should ask for better evidence before trusting the launch story.", likes=88, replies=12, views=5000),
+                _signal(2, "Huge risk if the team keeps moving fast without fixing the trust gap that this thread exposed.", likes=21, replies=4, views=4200),
+                _signal(3, "The upside is obvious if they execute, because dev workflows will compound around whatever tools earn trust first.", likes=65, replies=10, views=6100),
+                _signal(4, "I mostly want the factual timeline, because the comments are mixing product criticism with speculation.", likes=4, replies=0, views=1300),
+                _signal(5, "This feels fake and people should ask for better evidence before trusting the launch story again with real numbers.", likes=17, replies=3, views=3500),
+                _signal(6, "The upside is obvious if they execute, because developers still want a reliable workflow more than hype.", likes=19, replies=2, views=2600),
+                _signal(7, "Huge risk if community trust keeps slipping while the roadmap gets pushed again and again.", likes=8, replies=1, views=1700),
+                _signal(8, "I mostly want a clean explanation of what actually shipped, who it helps, and what changed this week.", likes=1, replies=0, views=900),
+                _signal(9, "This feels fake because the launch message is confident but the evidence in the thread is still thin.", likes=5, replies=1, views=1400),
+                _signal(10, "The upside is obvious if they can convert curiosity into actual product retention over the next month.", likes=6, replies=0, views=1100),
             ),
             source_label="评论区",
         ),
@@ -61,8 +74,15 @@ def test_render_topic_reference_note_contains_zero_learning_cost_sections():
     assert "## 这个主题是什么" in note
     assert "## 现在大家在聊什么" in note
     assert "## 当前主情绪" in note
+    assert "## 情绪分布" in note
     assert "## 主要分歧点" in note
     assert "## 高质量评论" in note
+    assert "## 按情绪分类看评论" in note
+    assert "### 质疑/求证" in note
+    assert "### 担忧/风险" in note
+    assert "### 兴奋/机会" in note
+    assert "### 中性/信息补充" in note
+    assert "https://x.com/user10/status/10" in note
     assert "## 可继续研究的方向" in note
     assert "[[02_可借用观点/" in note
 
@@ -72,6 +92,7 @@ def test_render_borrowable_viewpoints_note_contains_cross_reference_material():
 
     assert "## 最值得借的观点" in note
     assert "## 可交叉引用评论" in note
+    assert "https://x.com/user10/status/10" in note
     assert "## 可以继续展开的方向" in note
     assert "[[01_主题参考/" in note
 

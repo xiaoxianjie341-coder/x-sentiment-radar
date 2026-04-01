@@ -97,3 +97,58 @@ def test_crowd_context_service_falls_back_to_search_discussion_when_replies_are_
     assert summary.source_label == "相关讨论"
     assert len(summary.top_signals) == 2
     assert summary.top_signals[0].source_type == "discussion"
+
+
+def test_crowd_context_service_supplements_sparse_replies_with_thread_and_related_discussion():
+    service = CrowdContextService(
+        client=StubClient(
+            thread_items=[
+                _tweet("seed", text="seed text that is long enough to be ignored as the source seed", likes=100, replies=20, views=5000),
+                _tweet("t1", text="Thread follow-up adds useful context about why the roadmap credibility matters here.", likes=1, replies=0, views=120),
+            ],
+            reply_items=[
+                _tweet("r1", text="Reply one says trust is the real issue, not the announcement itself.", likes=0, replies=0, views=80),
+                _tweet("r2", text="Reply two says the launch sounds exciting if the team can actually ship on time.", likes=0, replies=0, views=70),
+            ],
+            search_items=[
+                _tweet("s1", text="Launch roadmap trust discussion says the market will care more about retention than theatrics.", likes=0, replies=0, views=400),
+                _tweet("s2", text="Launch roadmap trust discussion says the main fear is another delay damaging community trust even more.", likes=0, replies=0, views=300),
+                _tweet("s3", text="Launch roadmap trust discussion says curious builders still want proof instead of slogans in the comments.", likes=0, replies=0, views=200),
+            ],
+        ),
+        reply_sample_limit=10,
+        top_signal_count=5,
+        summarizer=None,
+    )
+
+    summary = service.build(tweet_id="seed", seed_text="Launch thread about roadmap credibility and trust.")
+
+    assert len(summary.top_signals) >= 5
+    assert {signal.source_type for signal in summary.top_signals} == {"reply", "thread", "discussion"}
+
+
+def test_crowd_context_service_keeps_extra_candidates_for_downstream_filtering():
+    reply_items = [
+        _tweet(
+            f"r{index}",
+            text=f"Reply {index} contains enough detail to survive ranking and downstream filtering for the final note.",
+            likes=0,
+            replies=0,
+            views=200 - index,
+        )
+        for index in range(12)
+    ]
+    service = CrowdContextService(
+        client=StubClient(
+            thread_items=[_tweet("seed", text="seed text that is long enough to be ignored as the source seed", likes=100, replies=20, views=5000)],
+            reply_items=reply_items,
+            search_items=[],
+        ),
+        reply_sample_limit=20,
+        top_signal_count=5,
+        summarizer=None,
+    )
+
+    summary = service.build(tweet_id="seed", seed_text="Seed topic text.")
+
+    assert len(summary.top_signals) == 12
