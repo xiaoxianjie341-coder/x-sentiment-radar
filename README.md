@@ -65,15 +65,15 @@ attentionvc_api_key = "avc_..."
 attentionvc_base_url = "https://api.attentionvc.ai"
 
 attentionvc_categories = ["ai", "crypto"]
-attentionvc_source_mode = "mixed"
-attentionvc_use_rising = false
+attentionvc_source_mode = "articles_only"
+attentionvc_use_rising = true
 
 attentionvc_search_queries = ["anthropic", "openai", "solana"]
 attentionvc_search_limit_per_query = 3
 
-attentionvc_article_min_views = 3000
-attentionvc_article_min_likes = 30
-attentionvc_article_min_replies = 10
+attentionvc_article_min_views = 2000
+attentionvc_article_min_likes = 20
+attentionvc_article_min_replies = 5
 
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
@@ -92,7 +92,7 @@ attentionvc_signal_min_replies = 2
 - `attentionvc_source_mode`
   - `"mixed"`：同时参考主题文章和普通 tweet
   - `"tweets_only"`：只抓普通 tweet
-  - `"articles_only"`：只抓文章
+  - `"articles_only"`：只抓文章。对新用户最稳，推荐默认使用这个。
 
 - `attentionvc_search_queries`
   - 你想重点盯的基础主题词
@@ -283,3 +283,21 @@ Still improving:
 - tweet-side discovery quality
 - high-quality reply reranking
 - better separation between weak-comment topics and strong-comment topics
+
+### Recommended default for first-time users / 推荐默认方式
+
+For the first run, the most stable setup is:
+
+- `attentionvc_source_mode = "articles_only"`
+- `attentionvc_use_rising = true`
+- `attentionvc_categories = ["ai", "crypto"]`
+- `attentionvc_reply_sample_limit = 100`
+
+第一次使用时，最推荐的默认方式是：
+
+- 先用 `articles_only`
+- 打开 `use_rising`
+- 先只看 `AI / Crypto`
+- 每个主题抓 `100` 条回复样本
+
+这样安装后更容易直接跑通，也更接近“傻瓜式上手”。

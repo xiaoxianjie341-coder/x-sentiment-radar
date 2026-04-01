@@ -8,7 +8,7 @@ obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 
 # Daily candidate budget is shared across all batch runs in the same local day.
 timezone = "Asia/Shanghai"
-daily_candidate_budget = 20
+daily_candidate_budget = 5
 batch_mode = "manual_or_cron"
 
 # High-signal handles influence candidate scoring.
@@ -40,23 +40,23 @@ attentionvc_api_key = ""
 attentionvc_base_url = "https://api.attentionvc.ai"
 attentionvc_categories = ["ai", "crypto"]
 attentionvc_window = "7d"
-attentionvc_limit_per_category = 10
-attentionvc_use_rising = false
+attentionvc_limit_per_category = 5
+attentionvc_use_rising = true
 attentionvc_rising_hours = 24
-attentionvc_search_queries = []
-attentionvc_search_limit_per_query = 5
-attentionvc_source_mode = "mixed"
+attentionvc_search_queries = ["anthropic", "openai", "solana"]
+attentionvc_search_limit_per_query = 3
+attentionvc_source_mode = "articles_only"
 attentionvc_seed_min_views = 1000
 attentionvc_seed_min_likes = 20
 attentionvc_seed_min_replies = 5
-attentionvc_article_min_views = 3000
-attentionvc_article_min_likes = 30
-attentionvc_article_min_replies = 10
+attentionvc_article_min_views = 2000
+attentionvc_article_min_likes = 20
+attentionvc_article_min_replies = 5
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
 attentionvc_tweet_min_replies = 3
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
-attentionvc_signal_min_views = 50
+attentionvc_signal_min_views = 100
 attentionvc_signal_min_likes = 1
 attentionvc_signal_min_replies = 1
