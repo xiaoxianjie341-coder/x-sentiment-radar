@@ -16,8 +16,7 @@ class TopicWorkspacePublisher:
         radar_dir = self.obsidian_root / "00_今日雷达"
         topic_dir = self.obsidian_root / "01_主题参考"
         viewpoints_dir = self.obsidian_root / "02_可借用观点"
-        processed_dir = self.obsidian_root / "03_处理记录"
-        for directory in (radar_dir, topic_dir, viewpoints_dir, processed_dir):
+        for directory in (radar_dir, topic_dir, viewpoints_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
         radar_path = radar_dir / f"{day_key} 今日雷达.md"
