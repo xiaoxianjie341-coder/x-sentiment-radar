@@ -11,7 +11,7 @@ def test_load_settings_defaults_obsidian_contract():
     assert settings.obsidian_vault == Path.home() / "Documents/Obsidian Vault"
     assert settings.obsidian_root.name == "推特运营Agent"
     assert settings.timezone == "Asia/Shanghai"
-    assert settings.daily_candidate_budget == 20
+    assert settings.daily_candidate_budget == 5
     assert settings.batch_mode == "manual_or_cron"
     assert settings.writer_base_url == ""
     assert settings.writer_api_key == ""
