@@ -20,7 +20,7 @@ def test_load_settings_defaults_obsidian_contract():
     assert settings.attentionvc_api_key == ""
     assert settings.attentionvc_categories == ("ai", "crypto")
     assert settings.attentionvc_use_rising is True
-    assert settings.attentionvc_search_queries == ()
+    assert settings.attentionvc_search_queries == ("anthropic", "openai", "solana")
     assert settings.attentionvc_top_signal_count == 5
     assert settings.attentionvc_source_mode == "mixed"
     assert settings.attentionvc_seed_min_views == 1000
