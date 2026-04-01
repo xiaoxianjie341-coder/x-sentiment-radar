@@ -1,0 +1,62 @@
+# Discovery must use the Trieu research profile.
+list_id = "2037242527036956865"
+opencli_profile_name = "Trieu"
+
+# Obsidian output target.
+obsidian_vault = "/absolute/path/to/Obsidian Vault"
+obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
+
+# Daily candidate budget is shared across all batch runs in the same local day.
+timezone = "Asia/Shanghai"
+daily_candidate_budget = 20
+batch_mode = "manual_or_cron"
+
+# High-signal handles influence candidate scoring.
+high_signal_source_handles = [
+  "TukiFromKL",
+]
+
+# Preferred capture is twscrape; fallback is x-tweet-fetcher + camofox.
+twscrape_db = "data/twscrape/accounts.db"
+twscrape_expected_login = "Trieu"
+x_fetcher_script = "scripts/x-tweet-fetcher.py"
+x_fetcher_browser = "camofox"
+
+# Local persistence.
+sqlite_db = "data/twitter_ops_agent.sqlite3"
+
+# Optional LLM writer. When configured, draft generation is delegated to the model
+# using your local style examples plus the research card. Leave blank to use the
+# built-in fallback template writer.
+writer_base_url = ""
+writer_api_key = ""
+writer_model = ""
+writer_api_mode = "responses"
+writer_reasoning_effort = ""
+
+# Optional AttentionVC discovery source. When configured, the batch pipeline will
+# ingest top article candidates from AttentionVC alongside your X List discovery.
+attentionvc_api_key = ""
+attentionvc_base_url = "https://api.attentionvc.ai"
+attentionvc_categories = ["ai", "crypto"]
+attentionvc_window = "7d"
+attentionvc_limit_per_category = 10
+attentionvc_use_rising = false
+attentionvc_rising_hours = 24
+attentionvc_search_queries = []
+attentionvc_search_limit_per_query = 5
+attentionvc_source_mode = "mixed"
+attentionvc_seed_min_views = 1000
+attentionvc_seed_min_likes = 20
+attentionvc_seed_min_replies = 5
+attentionvc_article_min_views = 3000
+attentionvc_article_min_likes = 30
+attentionvc_article_min_replies = 10
+attentionvc_tweet_min_views = 500
+attentionvc_tweet_min_likes = 10
+attentionvc_tweet_min_replies = 3
+attentionvc_reply_sample_limit = 100
+attentionvc_top_signal_count = 10
+attentionvc_signal_min_views = 50
+attentionvc_signal_min_likes = 1
+attentionvc_signal_min_replies = 1
