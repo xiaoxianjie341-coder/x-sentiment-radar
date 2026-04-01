@@ -4,9 +4,9 @@
 
 `x-sentiment-radar` 是一个面向 `AI / Crypto` 运营者的情绪优先研究助手。
 
-它的核心任务不是自动发帖，而是：
+它当前做的是：
 
-`发现正在起势的主题 -> 抓原帖和真实回复 -> 提炼主情绪和主要分歧 -> 把可借用观点写进 Obsidian`
+`发现起势主题 -> 抓原帖 / 回复 / thread / 相关讨论 -> 提炼主情绪和主要分歧 -> 把可借用观点写进 Obsidian`
 
 它不是：
 
@@ -17,37 +17,55 @@
 它是：
 
 - 一个主题雷达
-- 一个评论区/分歧挖掘工具
+- 一个评论区 / 分歧挖掘工具
 - 一个帮助你继续人工研究的助手
 
-### 主要命令
+### 当前已经实现的能力
+
+- `doctor`：检查当前解析到的 `obsidian_root` 和 `sqlite_db`
+- `run-v2`：执行完整的主题发现和写入流程
+- 基于 `AttentionVC` 做主题发现
+- 支持 `article / tweet / related discussion` 多来源补充
+- 每个主题最多抓 `100` 条回复样本
+- 默认尽量保留 `10` 条评论用于输出
+- 默认不按最低浏览 / 最低点赞硬砍评论
+- 主题页里输出：
+  - 当前主情绪
+  - 情绪分布
+  - 主要分歧点
+  - 高质量评论
+  - 按情绪分类看评论
+- 写入 `00_今日雷达 / 01_主题参考 / 02_可借用观点`
+- 用本地 SQLite 记录 `last_seen_attention_v2_ids`，避免重复处理同一批主题
+- 可选接入 `OpenAI-compatible` 的 writer，用模型替代内置启发式总结
+
+### 安装
+
+要求：
+
+- `Python >= 3.14`
+- 一个可用的 `AttentionVC API key`
+- 一个你想写入的 `Obsidian` 路径
+
+推荐安装方式：
 
 ```bash
-python3 -m twitter_ops_agent.cli run-v2
+git clone https://github.com/xiaoxianjie341-coder/x-sentiment-radar.git
+cd x-sentiment-radar
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-如果你本地已经 `pip install -e .`：
+安装完成后，推荐用这个命令，不要直接依赖未安装状态下的 `python -m ...`：
 
 ```bash
+twitter-ops-agent doctor
 twitter-ops-agent run-v2
 ```
 
-### Obsidian 输出
-
-系统会把结果写进：
-
-- `00_今日雷达`
-- `01_主题参考`
-- `02_可借用观点`
-
-推荐使用顺序：
-
-1. 先看 `00_今日雷达`
-2. 再点进 `01_主题参考`
-3. 如果这个主题值得继续挖，再看 `02_可借用观点`
-4. 最后还是你自己继续研究，再决定发不发
-
-### 最低配置
+### 第一次配置
 
 先复制配置文件：
 
@@ -55,7 +73,7 @@ twitter-ops-agent run-v2
 cp config/settings.example.toml config/settings.toml
 ```
 
-至少要配置这些：
+新用户至少要改这几个：
 
 ```toml
 obsidian_vault = "/absolute/path/to/Obsidian Vault"
@@ -64,10 +82,15 @@ obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 attentionvc_api_key = "avc_..."
 attentionvc_base_url = "https://api.attentionvc.ai"
 
+sqlite_db = "/absolute/path/to/your/sqlite.sqlite3"
+```
+
+如果你想按当前仓库的推荐默认值启动，配置建议是：
+
+```toml
 attentionvc_categories = ["ai", "crypto"]
 attentionvc_source_mode = "articles_only"
 attentionvc_use_rising = true
-
 attentionvc_search_queries = ["anthropic", "openai", "solana"]
 attentionvc_search_limit_per_query = 3
 
@@ -87,63 +110,137 @@ attentionvc_signal_min_likes = 0
 attentionvc_signal_min_replies = 0
 ```
 
-### 配置含义
+### 最重要的配置项说明
+
+- `obsidian_vault`
+  - 你的 Obsidian Vault 根目录
+
+- `obsidian_root`
+  - 这个项目真正写文件的目录
+  - 项目会自动创建这 3 个子目录：
+    - `00_今日雷达`
+    - `01_主题参考`
+    - `02_可借用观点`
+
+- `sqlite_db`
+  - 本地状态数据库
+  - 这里会保存 `last_seen_attention_v2_ids`
+  - 如果你想重新模拟“第一次运行”，请换一个新的 `sqlite_db` 路径
+
+- `attentionvc_api_key`
+  - 必填
+  - 需要真实可用并且有 credits 的 key
 
 - `attentionvc_source_mode`
-  - `"mixed"`：同时参考主题文章和普通 tweet
+  - `"articles_only"`：只抓文章型主题。第一次使用最稳
   - `"tweets_only"`：只抓普通 tweet
-  - `"articles_only"`：只抓文章。对新用户最稳，推荐默认使用这个。
+  - `"mixed"`：两边都抓
 
-- `attentionvc_search_queries`
-  - 你想重点盯的基础主题词
-
-- `attentionvc_article_min_*`
-  - 文章类来源的最低门槛
-
-- `attentionvc_tweet_min_*`
-  - 普通 tweet 的最低门槛
+- `attentionvc_use_rising`
+  - 是否使用 rising 文章入口
+  - 当前默认推荐打开
 
 - `attentionvc_reply_sample_limit = 100`
-  - 每个主题最多抓 100 条回复样本
+  - 每个主题最多抓 `100` 条回复样本
 
 - `attentionvc_top_signal_count = 10`
-  - 默认输出前 10 条评论，并在笔记里按情绪分组展示
+  - 最终尽量保留 `10` 条评论用于输出
 
 - `attentionvc_signal_min_* = 0`
-  - 默认不按最低浏览 / 最低点赞硬过滤评论，避免把低互动但有价值的回复提前筛掉
+  - 默认不按浏览 / 点赞 / 回复做硬门槛过滤
+  - 这样低互动但有价值的评论也能保留下来
 
-### 关于 AttentionVC
+- `writer_*`
+  - 可选
+  - 如果你接了一个兼容 OpenAI API 的模型服务，评论总结会优先走 LLM
+  - 不填则走内置启发式总结
 
-这个项目目前主要用它来做：
+### 第一次运行
 
-- 热门主题发现
-- 类别洞察
-- 文章级别的起势发现
-- 普通 tweet 搜索
-- 回复抓取
-- thread 上下文抓取
+先检查当前实际会写到哪里：
 
-当前限制：
+```bash
+twitter-ops-agent doctor --json
+```
 
-- 文章侧“起势”信号比 tweet 侧更强
-- tweet 侧“正在起势”目前还是我们自己算的，不是平台直接给的成品能力
+如果输出里的 `obsidian_root` 和 `sqlite_db` 是你预期的，再执行：
 
-### 当前完成度
+```bash
+twitter-ops-agent run-v2
+```
 
-已经做到：
+成功时会返回类似：
 
-- 主题优先的发现流程
-- 回复分页抓取
-- 每个主题最多抓 100 条回复样本
-- 写入 `雷达 / 主题参考 / 可借用观点`
-- 主题参考页里默认展示 10 条评论，并按情绪分组
-- 雷达页里可直接点原推文
+```json
+{
+  "discovered_count": 12,
+  "selected_count": 12,
+  "radar_written": 1,
+  "topic_notes_written": 12,
+  "viewpoint_notes_written": 12
+}
+```
 
-还在继续优化：
+### Obsidian 里会看到什么
 
-- tweet 侧发现质量还不够强
-- 高质量评论排序还不够聪明
-- 还需要更好地区分“评论区很弱”和“评论区真有料”的主题
+`00_今日雷达`
+
+- 每天一张雷达页
+- 每个主题会显示：
+  - 赛道
+  - 原推文链接
+  - 当前主情绪
+  - 主要分歧
+  - 跳转到主题参考和可借用观点
+
+`01_主题参考`
+
+- 这个主题是什么
+- 原始内容
+- 现在大家在聊什么
+- 当前主情绪
+- 情绪分布
+- 主要分歧点
+- 高质量评论
+- 按情绪分类看评论
+- 可继续研究的方向
+
+`02_可借用观点`
+
+- 最值得借的观点
+- 可交叉引用评论
+- 可以继续展开的方向
+
+推荐使用顺序：
+
+1. 先看 `00_今日雷达`
+2. 再点进 `01_主题参考`
+3. 如果这个主题值得继续挖，再看 `02_可借用观点`
+4. 最后还是你自己继续研究，再决定发不发
+
+### 新用户最容易卡住的地方
+
+- 没有先 `pip install -e .`
+  - 推荐直接使用 `twitter-ops-agent ...`
+
+- `attentionvc_api_key` 不可用
+  - 空 key 会直接报错
+  - 没 credits 会返回 `402`
+  - 请求太密会返回 `429`
+
+- `obsidian_root` 配到了一个你当前 Obsidian 没打开的目录
+  - 文件其实已经写到磁盘上了
+  - 但如果那个目录不是你当前打开的 vault，你不会在 Obsidian 侧边栏里直接看到
+
+- 复跑时没换 `sqlite_db`
+  - 由于 `last_seen_attention_v2_ids` 已经存在，第二次不一定会再出同样主题
+
+### 当前限制
+
+- 主题发现目前仍然更偏 `article-first`
+- tweet 侧“正在起势”不是平台现成信号，而是本地排序近似
+- `doctor` 目前主要检查路径，不会提前帮你验证 `AttentionVC` credits 或 rate limit
+- 大批量跑时可能会撞到 `AttentionVC` 的每分钟请求限制
 
 ---
 
@@ -151,9 +248,9 @@ attentionvc_signal_min_replies = 0
 
 `x-sentiment-radar` is a sentiment-first X/Twitter research assistant for `AI / Crypto` operators.
 
-Its core job is:
+Current pipeline:
 
-`find rising topics -> inspect real replies -> summarize crowd emotion and disagreement -> surface borrowable viewpoints in Obsidian`
+`discover rising topics -> fetch source tweet / replies / thread / related discussion -> summarize dominant emotion and disagreement -> write research notes into Obsidian`
 
 It is **not**:
 
@@ -167,34 +264,52 @@ It **is**:
 - a reply / disagreement mining tool
 - a research assistant for human operators
 
-### Main Command
+### What It Already Does
+
+- `doctor` command to inspect resolved `obsidian_root` and `sqlite_db`
+- `run-v2` command for the full workflow
+- AttentionVC-powered topic discovery
+- reply / thread / related-discussion enrichment
+- up to `100` reply samples per topic
+- keep up to `10` comments for output by default
+- no hard min-view / min-like filtering by default for final comments
+- topic notes with:
+  - dominant emotion
+  - emotion distribution
+  - primary tension
+  - top comments
+  - comments grouped by emotion
+- writes into `00_今日雷达 / 01_主题参考 / 02_可借用观点`
+- local SQLite state for `last_seen_attention_v2_ids`
+- optional OpenAI-compatible writer integration
+
+### Install
+
+Requirements:
+
+- `Python >= 3.14`
+- a working `AttentionVC API key`
+- an `Obsidian` path you want to write into
+
+Recommended setup:
 
 ```bash
-python3 -m twitter_ops_agent.cli run-v2
+git clone https://github.com/xiaoxianjie341-coder/x-sentiment-radar.git
+cd x-sentiment-radar
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
 ```
 
-If installed in editable mode:
+After install, use:
 
 ```bash
+twitter-ops-agent doctor
 twitter-ops-agent run-v2
 ```
 
-### Obsidian Output
-
-The project writes into:
-
-- `00_今日雷达`
-- `01_主题参考`
-- `02_可借用观点`
-
-Recommended operator flow:
-
-1. Open `00_今日雷达`
-2. Click one topic in `01_主题参考`
-3. Open `02_可借用观点` if the topic looks promising
-4. Continue manual research before posting
-
-### Minimum Setup
+### First-Time Config
 
 Copy the example config:
 
@@ -202,7 +317,7 @@ Copy the example config:
 cp config/settings.example.toml config/settings.toml
 ```
 
-Set at least:
+At minimum, set:
 
 ```toml
 obsidian_vault = "/absolute/path/to/Obsidian Vault"
@@ -211,16 +326,21 @@ obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 attentionvc_api_key = "avc_..."
 attentionvc_base_url = "https://api.attentionvc.ai"
 
-attentionvc_categories = ["ai", "crypto"]
-attentionvc_source_mode = "mixed"
-attentionvc_use_rising = false
+sqlite_db = "/absolute/path/to/your/sqlite.sqlite3"
+```
 
+Recommended current defaults:
+
+```toml
+attentionvc_categories = ["ai", "crypto"]
+attentionvc_source_mode = "articles_only"
+attentionvc_use_rising = true
 attentionvc_search_queries = ["anthropic", "openai", "solana"]
 attentionvc_search_limit_per_query = 3
 
-attentionvc_article_min_views = 3000
-attentionvc_article_min_likes = 30
-attentionvc_article_min_replies = 10
+attentionvc_article_min_views = 2000
+attentionvc_article_min_likes = 20
+attentionvc_article_min_replies = 5
 
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
@@ -234,78 +354,108 @@ attentionvc_signal_min_likes = 0
 attentionvc_signal_min_replies = 0
 ```
 
-### What These Settings Mean
+### Important Config Notes
+
+- `obsidian_root`
+  - actual write target for generated notes
+  - the project auto-creates:
+    - `00_今日雷达`
+    - `01_主题参考`
+    - `02_可借用观点`
+
+- `sqlite_db`
+  - stores local run state
+  - includes `last_seen_attention_v2_ids`
+  - use a fresh DB path if you want to simulate a first-ever run again
+
+- `attentionvc_api_key`
+  - required
+  - must be valid and have available credits
 
 - `attentionvc_source_mode`
-  - `"mixed"`: use both article-side topic signals and normal tweets
-  - `"tweets_only"`: normal tweet discovery only
-  - `"articles_only"`: article discovery only
-
-- `attentionvc_search_queries`
-  - base topic keywords you care about
-
-- `attentionvc_article_min_*`
-  - minimum thresholds for article-side inputs
-
-- `attentionvc_tweet_min_*`
-  - minimum thresholds for normal tweet-side inputs
-
-- `attentionvc_reply_sample_limit = 100`
-  - fetch up to 100 reply samples per topic
+  - `"articles_only"`: safest first-run default
+  - `"tweets_only"`: tweet-only discovery
+  - `"mixed"`: combine both
 
 - `attentionvc_top_signal_count = 10`
-  - keep 10 comments by default and show them grouped by audience emotion in the note
+  - try to keep `10` comments in final output
 
 - `attentionvc_signal_min_* = 0`
-  - do not hard-filter low-engagement replies by default, so sparse but useful comments still survive
+  - do not hard-drop low-engagement replies by default
 
-### AttentionVC Reality
+- `writer_*`
+  - optional
+  - if configured, audience summary uses your OpenAI-compatible model endpoint
+  - otherwise the built-in heuristic summary is used
 
-This project currently uses AttentionVC for:
+### First Run
 
-- trending topic discovery
-- category insights
-- article-side rising detection
-- normal tweet search
-- reply fetching
-- thread context fetching
+Check resolved paths first:
 
-Current limitation:
+```bash
+twitter-ops-agent doctor --json
+```
 
-- article-side discovery is stronger than raw tweet-side discovery
-- tweet-side “rising” still depends on our own ranking logic
+Then run:
 
-### Current Maturity
+```bash
+twitter-ops-agent run-v2
+```
 
-Already working:
+Successful output looks like:
 
-- topic-first radar flow
-- reply pagination
-- up to 100 reply samples per topic
-- radar / topic / viewpoint pages in Obsidian
-- top 10 comments grouped by emotion inside topic notes
-- source links in radar
+```json
+{
+  "discovered_count": 12,
+  "selected_count": 12,
+  "radar_written": 1,
+  "topic_notes_written": 12,
+  "viewpoint_notes_written": 12
+}
+```
 
-Still improving:
+### What Appears In Obsidian
 
-- tweet-side discovery quality
-- high-quality reply reranking
-- better separation between weak-comment topics and strong-comment topics
+`00_今日雷达`
 
-### Recommended default for first-time users / 推荐默认方式
+- daily radar page
+- each topic includes:
+  - track
+  - source link
+  - dominant emotion
+  - primary tension
+  - links to topic and viewpoint notes
 
-For the first run, the most stable setup is:
+`01_主题参考`
 
-- `attentionvc_source_mode = "articles_only"`
-- `attentionvc_use_rising = true`
-- `attentionvc_categories = ["ai", "crypto"]`
-- `attentionvc_reply_sample_limit = 100`
+- what the topic is
+- source details
+- why it matters now
+- dominant emotion
+- emotion distribution
+- primary tension
+- top comments
+- comments grouped by emotion
+- next research directions
 
-第一次使用时，最推荐的默认方式是：
+`02_可借用观点`
 
-- 先用 `articles_only`
-- 打开 `use_rising`
-- 先只看 `AI / Crypto`
-- 每个主题抓 `100` 条回复样本
+- borrowable viewpoints
+- cross-reference comments
+- expansion directions
 
-这样安装后更容易直接跑通，也更接近“傻瓜式上手”。
+### Common First-Run Failure Modes
+
+- forgot `pip install -e .`
+- invalid / empty AttentionVC key
+- insufficient AttentionVC credits
+- AttentionVC rate limit (`429`)
+- `obsidian_root` points to a folder not currently opened in Obsidian
+- reused old `sqlite_db` and expected a fresh run
+
+### Current Limitations
+
+- discovery is still article-first in practice
+- tweet-side “rising” is a local approximation, not a platform-native signal
+- `doctor` mostly validates paths, not AttentionVC auth/credits/rate-limit health
+- large batch runs may still hit AttentionVC per-minute request limits
