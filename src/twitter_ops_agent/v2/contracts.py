@@ -43,6 +43,7 @@ class TopicWorkspaceItem:
     dominant_emotion: str
     primary_tension: str
     crowd_summary: CrowdSummary
+    language_version: str | None = None
     research_directions: tuple[str, ...] = ()
     borrowable_viewpoints: tuple[str, ...] = ()
     created_at: datetime = field(default_factory=datetime.utcnow)

@@ -44,9 +44,7 @@
 要求：
 
 - `Python >= 3.14`
-- 二选一：
-  - 一个可用的 `AttentionVC API key`
-  - 或一个可用的 `twscrape` 账号池 / cookies
+- 新用户默认只需要一个可用的 `X` 登录态
 - 一个你想写入的 `Obsidian` 路径
 
 推荐安装方式：
@@ -67,7 +65,7 @@ twitter-ops-agent doctor
 twitter-ops-agent run-v2
 ```
 
-如果你已经配好了本地浏览器会话，想直接跑免费的 `XHunt + browser-session` 链路，也可以直接用：
+如果你已经配好了本地浏览器会话，推荐直接跑免费的 `XHunt + browser-session` 链路：
 
 ```bash
 ./scripts/run-xhunt-free.sh
@@ -90,11 +88,26 @@ obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 sqlite_db = "/absolute/path/to/your/sqlite.sqlite3"
 ```
 
-免费低风控模式推荐这样配：
+如果你不想配 `AttentionVC`，只想看推文，最小可用配置就是再补这 3 行：
 
 ```toml
-twscrape_db = "data/twscrape/accounts.db"
-twscrape_search_enabled = false
+attentionvc_api_key = ""
+
+x_session_cookie_header = "你的 X 登录 cookies"
+x_session_x_client_transaction_id = "你的 x-client-transaction-id"
+```
+
+这时系统会直接走 `XHunt + browser-session`：
+
+- 只看推文，不看文章
+- 默认同时抓 `cn + global`
+- 默认抓过去 `24h` 的前 `15` 条
+- 跑完直接写进 Obsidian
+
+完整的免费推文模式推荐配置如下：
+
+```toml
+attentionvc_api_key = ""
 
 xhunt_groups = ["cn", "global"]
 xhunt_hours = 24
@@ -102,13 +115,16 @@ xhunt_limit = 15
 xhunt_min_views = 1000
 xhunt_min_likes = 10
 
+x_session_cookie_header = "你的 X 登录 cookies"
+x_session_x_client_transaction_id = "你的 x-client-transaction-id"
+
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
 ```
 
-如果你想继续用付费模式，再补：
+如果你想继续用付费模式、补文章源，再额外配：
 
 ```toml
 attentionvc_api_key = "avc_..."
@@ -132,20 +148,21 @@ attentionvc_base_url = "https://api.attentionvc.ai"
   - 这里会保存 `last_seen_attention_v2_ids` 或 `last_seen_xhunt_v2_ids`
   - 如果你想重新模拟“第一次运行”，请换一个新的 `sqlite_db` 路径
 
-- `twscrape_db`
-  - `twscrape` 的账号池数据库
-  - 免费模式下 `run-v2` 会从这里读取账号 / cookies
+- `x_session_cookie_header`
+  - 你的 X 登录 cookies
+  - 这是“只看推文”路线的关键配置
 
-- `twscrape_search_enabled = false`
-  - 默认关闭关键词搜索 fallback
-  - 这样更低风控，只做“原帖详情 + 顶层回复”抓取
+- `x_session_x_client_transaction_id`
+  - 浏览器请求里对应的 transaction id
+  - 配好它后，系统会优先走 `browser-session`，不依赖 `twscrape`
 
 - `xhunt_*`
-  - 免费模式的发现入口
+  - 免费推文路线的发现入口
   - 默认会同时抓 `cn + global` 两个榜单
-  - 每个榜单都会取过去 `24h` 的前 `15` 条，再用 `twscrape` 补原帖全文和回复
+  - 每个榜单都会取过去 `24h` 的前 `15` 条
 
 - `attentionvc_source_mode`
+  - 这是 `AttentionVC` 专用配置
   - `"articles_only"`：只抓文章型主题。第一次使用最稳
   - `"tweets_only"`：只抓普通 tweet
   - `"mixed"`：两边都抓
@@ -153,6 +170,7 @@ attentionvc_base_url = "https://api.attentionvc.ai"
 - `attentionvc_use_rising`
   - 是否使用 rising 文章入口
   - 当前默认推荐打开
+  - 这同样只对 `AttentionVC` 生效
 
 - `attentionvc_reply_sample_limit = 100`
   - 每个主题最多抓 `100` 条回复样本
@@ -181,7 +199,7 @@ twitter-ops-agent doctor --json
 如果输出里的 `obsidian_root` 和 `sqlite_db` 是你预期的，再执行：
 
 ```bash
-twitter-ops-agent run-v2
+./scripts/run-xhunt-free.sh
 ```
 
 成功时会返回类似：
@@ -240,13 +258,13 @@ twitter-ops-agent run-v2
 
 - `attentionvc_api_key` 不可用
   - 现在不是必填
-  - 如果配置了空 key，不会报错，但会回退到 `XHunt + twscrape`
+  - 留空后会优先尝试 `XHunt + browser-session`
   - 没 credits 会返回 `402`
   - 请求太密会返回 `429`
 
-- `twscrape` 账号池没有准备好
-  - 免费模式下会直接报错
-  - 推荐先确认 `accounts.db` 里有可用 cookies
+- 没配 `x_session_cookie_header` / `x_session_x_client_transaction_id`
+  - 这时就无法走最简单的推文路线
+  - 如果同时也没有可用的 `twscrape` 账号池，就会直接报错
 
 - `obsidian_root` 配到了一个你当前 Obsidian 没打开的目录
   - 文件其实已经写到磁盘上了
@@ -258,10 +276,10 @@ twitter-ops-agent run-v2
 ### 当前限制
 
 - `XHunt` 目前走的是公共页面解析，不是官方 API
-- 免费模式下 `twscrape` 默认只抓原帖详情和顶层回复，不主动放大搜索面
+- `browser-session` 依赖你本地 X 登录态持续有效
 - tweet 侧“正在起势”不是平台现成信号，而是本地排序近似
-- `doctor` 目前主要检查路径，不会提前帮你验证 `AttentionVC` credits 或 `twscrape` 账号健康
-- 大批量跑时可能会撞到 `AttentionVC` 或 `twscrape` 的各自限制
+- `doctor` 目前主要检查路径，不会提前帮你验证 `AttentionVC` credits、cookies 或浏览器会话健康
+- 大批量跑时可能会撞到 `AttentionVC`、X 或 `twscrape` 的各自限制
 
 ---
 
@@ -309,9 +327,7 @@ It **is**:
 Requirements:
 
 - `Python >= 3.14`
-- either:
-  - a working `AttentionVC API key`
-  - or a prepared `twscrape` account pool / cookies
+- for the default beginner path, just a working logged-in `X` browser session
 - an `Obsidian` path you want to write into
 
 Recommended setup:
@@ -332,7 +348,7 @@ twitter-ops-agent doctor
 twitter-ops-agent run-v2
 ```
 
-If your local browser session is already configured and you want the free `XHunt + browser-session` path directly, you can also run:
+If your local browser session is configured, this is the recommended beginner path:
 
 ```bash
 ./scripts/run-xhunt-free.sh
@@ -355,17 +371,35 @@ obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 sqlite_db = "/absolute/path/to/your/sqlite.sqlite3"
 ```
 
-Recommended free low-risk mode:
+If you do not want `AttentionVC` and only want tweet-based discovery, the real minimum is:
 
 ```toml
-twscrape_db = "data/twscrape/accounts.db"
-twscrape_search_enabled = false
+attentionvc_api_key = ""
+
+x_session_cookie_header = "your logged-in X cookies"
+x_session_x_client_transaction_id = "your x-client-transaction-id"
+```
+
+That makes the app use `XHunt + browser-session`:
+
+- tweet-only workflow
+- default `cn + global`
+- default last `24h`
+- default top `15`
+
+Recommended full free tweet mode:
+
+```toml
+attentionvc_api_key = ""
 
 xhunt_groups = ["cn", "global"]
 xhunt_hours = 24
 xhunt_limit = 15
 xhunt_min_views = 1000
 xhunt_min_likes = 10
+
+x_session_cookie_header = "your logged-in X cookies"
+x_session_x_client_transaction_id = "your x-client-transaction-id"
 
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
@@ -374,7 +408,7 @@ attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
 ```
 
-If you want the paid path instead, also set:
+If you want the paid article path too, also set:
 
 ```toml
 attentionvc_api_key = "avc_..."
@@ -395,14 +429,28 @@ attentionvc_base_url = "https://api.attentionvc.ai"
   - includes `last_seen_attention_v2_ids`
   - use a fresh DB path if you want to simulate a first-ever run again
 
-- `attentionvc_api_key`
-  - required
-  - must be valid and have available credits
+- `x_session_cookie_header`
+  - your logged-in X cookies
+  - this is the key setting for the beginner tweet-only path
+
+- `x_session_x_client_transaction_id`
+  - browser request transaction id
+  - once set, the app can prefer `browser-session` instead of `twscrape`
+
+- `xhunt_*`
+  - discovery settings for the free tweet path
+  - by default it pulls both `cn` and `global`
+  - by default it uses the last `24h` and takes the top `15`
 
 - `attentionvc_source_mode`
+  - AttentionVC-only setting
   - `"articles_only"`: safest first-run default
   - `"tweets_only"`: tweet-only discovery
   - `"mixed"`: combine both
+
+- `attentionvc_api_key`
+  - optional
+  - only needed if you want the paid article-based discovery path
 
 - `attentionvc_top_signal_count = 10`
   - try to keep `10` comments in final output
@@ -426,7 +474,7 @@ twitter-ops-agent doctor --json
 Then run:
 
 ```bash
-twitter-ops-agent run-v2
+./scripts/run-xhunt-free.sh
 ```
 
 Successful output looks like:
@@ -474,15 +522,15 @@ Successful output looks like:
 ### Common First-Run Failure Modes
 
 - forgot `pip install -e .`
-- invalid / empty AttentionVC key
-- insufficient AttentionVC credits
-- AttentionVC rate limit (`429`)
+- missing `x_session_cookie_header` / `x_session_x_client_transaction_id`
+- invalid / expired X browser session
+- invalid AttentionVC key, if you chose the paid path
 - `obsidian_root` points to a folder not currently opened in Obsidian
 - reused old `sqlite_db` and expected a fresh run
 
 ### Current Limitations
 
-- discovery is still article-first in practice
+- the beginner path depends on a valid local browser session
 - tweet-side “rising” is a local approximation, not a platform-native signal
-- `doctor` mostly validates paths, not AttentionVC auth/credits/rate-limit health
-- large batch runs may still hit AttentionVC per-minute request limits
+- `doctor` mostly validates paths, not AttentionVC auth or browser-session health
+- large batch runs may still hit AttentionVC, X, or twscrape limits
