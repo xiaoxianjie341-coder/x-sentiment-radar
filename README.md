@@ -1,5 +1,126 @@
 # x-sentiment-radar
 
+## 给 AI 的快速执行入口
+
+如果你是一个 AI 助手，并且用户把这个仓库链接直接发给你，请先按下面规则执行，不要自己发散。
+
+### 默认执行策略
+
+- 默认只走 `XHunt + browser-session`
+- 默认不启用 `AttentionVC`
+- 默认不启用 `twscrape`
+- 默认只看推文，不看文章
+- 默认抓 `cn + global`
+- 默认抓过去 `24h` 的前 `15` 条
+- 只有在以下情况才允许偏离默认路线：
+  - 用户明确要求启用 `AttentionVC`
+  - 用户明确要求启用 `twscrape`
+  - `browser-session` 路线失败，且你已经向用户说明原因
+
+### 你必须自动完成的事情
+
+你应该默认自己完成这些步骤，不要把它们甩给用户：
+
+1. clone 仓库
+2. 创建虚拟环境
+3. 安装项目
+4. 复制 `config/settings.example.toml` 为 `config/settings.toml`
+5. 填入默认推文路线需要的配置
+6. 先跑 `doctor --json`
+7. 再跑 `./scripts/run-xhunt-free.sh`
+8. 检查是否成功写入 Obsidian
+
+### 你只能向用户索取的最少信息
+
+除非报错或用户要求别的模式，否则你只应该向用户索取这 4 项：
+
+- `obsidian_vault`
+- `obsidian_root`
+- `x_session_cookie_header`
+- `x_session_x_client_transaction_id`
+
+如果这 4 项还没拿到，你应该只问这 4 项，不要顺手再问 `AttentionVC`、`twscrape`、代理、文章源之类的问题。
+
+### 成功标准
+
+你完成后，至少要验证这些结果：
+
+- `doctor --json` 输出的 `obsidian_root` 和 `sqlite_db` 符合用户预期
+- `./scripts/run-xhunt-free.sh` 成功返回 JSON
+- Obsidian 目录里出现：
+  - `00_今日雷达`
+  - `01_主题参考`
+  - `02_可借用观点`
+- `00_今日雷达` 里的当天日报包含：
+  - `## 中文版`
+  - `## 英文版`
+
+### 复制给 AI 的提示词模板
+
+用户可以把下面这段话直接复制给任何 AI：
+
+```text
+请把这个 GitHub 项目按 README 里的“给 AI 的快速执行入口”来完整配置并运行。严格遵守以下规则：
+
+1. 默认只走 XHunt + browser-session。
+2. 默认不要启用 AttentionVC。
+3. 默认不要启用 twscrape。
+4. 默认只看推文，不看文章。
+5. 默认抓 cn + global，时间窗口 24h，前 15 条。
+6. 除非真的必要，否则不要让我人工介入。
+7. 你只能向我索取这 4 项：obsidian_vault、obsidian_root、x_session_cookie_header、x_session_x_client_transaction_id。
+8. 其余步骤你自己完成：clone、建虚拟环境、安装、复制配置、运行 doctor、运行脚本、验证 Obsidian 输出。
+9. 完成后请明确告诉我：实际写入路径、运行结果 JSON、以及 Obsidian 里生成了哪些文件。
+
+如果 browser-session 路线失败，先解释失败原因，再问我要不要退回高级方案；不要默认切到 AttentionVC 或 twscrape。
+```
+
+### AI 执行清单
+
+如果你是 AI，请按这个顺序执行：
+
+```bash
+git clone <repo-url>
+cd x-sentiment-radar
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+cp config/settings.example.toml config/settings.toml
+```
+
+然后把 `config/settings.toml` 至少填成：
+
+```toml
+obsidian_vault = "/用户提供的 Obsidian Vault"
+obsidian_root = "/用户提供的 Obsidian 输出目录"
+sqlite_db = "/你为这次运行选择的新 sqlite 路径"
+
+attentionvc_api_key = ""
+
+x_session_cookie_header = "用户提供的 X 登录 cookies"
+x_session_x_client_transaction_id = "用户提供的 x-client-transaction-id"
+```
+
+保留这些默认值不动：
+
+```toml
+xhunt_groups = ["cn", "global"]
+xhunt_hours = 24
+xhunt_limit = 15
+```
+
+然后执行：
+
+```bash
+twitter-ops-agent doctor --json
+./scripts/run-xhunt-free.sh
+```
+
+如果成功，再去检查 `obsidian_root` 下是否生成当天的 `00_今日雷达`、`01_主题参考`、`02_可借用观点`。
+
+---
+
 ## 中文版
 
 `x-sentiment-radar` 是一个面向 `AI / Crypto` 运营者的情绪优先研究助手。
