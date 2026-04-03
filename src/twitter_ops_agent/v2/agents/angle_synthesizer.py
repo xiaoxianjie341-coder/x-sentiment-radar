@@ -32,6 +32,7 @@ class AngleSynthesizerAgent:
             dominant_emotion=_infer_emotion_label(crowd_summary.sentiment_summary),
             primary_tension=primary_tension,
             crowd_summary=crowd_summary,
+            language_version=_infer_language_version(seed, title=title),
             research_directions=research_directions,
             borrowable_viewpoints=borrowable_viewpoints,
             created_at=datetime.fromisoformat(self.day_key).replace(tzinfo=timezone.utc),
@@ -85,3 +86,17 @@ def _infer_emotion_label(sentiment_summary: str) -> str:
     if "分歧" in sentiment_summary:
         return "分裂"
     return "观察"
+
+
+def _infer_language_version(seed: HydratedSeed, *, title: str) -> str:
+    query = (seed.seed.query or "").strip().lower()
+    if query in {"cn", "zh", "china", "chinese"}:
+        return "中文版"
+    if query in {"global", "en", "english"}:
+        return "英文版"
+    sample = f"{title}\n{seed.source_text}"
+    return "中文版" if _contains_cjk(sample) else "英文版"
+
+
+def _contains_cjk(text: str) -> bool:
+    return any("\u4e00" <= char <= "\u9fff" for char in text)

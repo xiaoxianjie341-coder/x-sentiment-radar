@@ -25,16 +25,16 @@ def _signal(index: int, text: str, *, likes: int = 0, replies: int = 0, views: i
     )
 
 
-def _item() -> TopicWorkspaceItem:
+def _item(*, title: str = "Anthropic Source Leak", seed_text: str = "Anthropic accidentally shipped internal source maps.", language_version: str = "英文版") -> TopicWorkspaceItem:
     return TopicWorkspaceItem(
         event_id="event-1",
-        note_stem="2026-04-01 [AI] Anthropic Source Leak",
+        note_stem=f"2026-04-01 [AI] {title}",
         track="AI",
-        title="Anthropic Source Leak",
+        title=title,
         source_kind="tweet",
         source_url="https://x.com/example/status/1",
         source_author_handle="anthropicnews",
-        seed_text="Anthropic accidentally shipped internal source maps.",
+        seed_text=seed_text,
         why_now="The topic is accelerating and replies are forming a clear argument about trust and distribution.",
         dominant_emotion="质疑",
         primary_tension="大家在争这是事故、营销，还是能力泄露。",
@@ -64,6 +64,7 @@ def _item() -> TopicWorkspaceItem:
             "真正值得写的不是泄露本身，而是开发者为什么这么渴望看到 AI 工具的内部实现。",
             "如果评论区一直在讨论可信度，那就说明『信任』已经成了这个话题的主战场。",
         ),
+        language_version=language_version,
         created_at=datetime(2026, 4, 1, tzinfo=timezone.utc),
     )
 
@@ -105,6 +106,26 @@ def test_render_radar_note_links_to_topic_and_viewpoints():
     assert "https://x.com/example/status/1" in note
     assert "[[01_主题参考/2026-04-01 [AI] Anthropic Source Leak]]" in note
     assert "[[02_可借用观点/2026-04-01 [AI] Anthropic Source Leak]]" in note
+
+
+def test_render_radar_note_groups_items_into_chinese_and_english_sections():
+    chinese = _item(
+        title="2030年大预言：会用AI的人进入新贵族，不会用的人变成数字农奴",
+        seed_text="2030年大预言：会用AI的人进入新贵族，不会用的人变成数字农奴",
+        language_version="中文版",
+    )
+    english = _item(
+        title="Anthropic Source Leak",
+        seed_text="Anthropic accidentally shipped internal source maps.",
+        language_version="英文版",
+    )
+
+    note = render_radar_note(day_key="2026-04-01", items=[english, chinese])
+
+    assert "## 中文版" in note
+    assert "## 英文版" in note
+    assert note.index("## 中文版") < note.index("2030年大预言")
+    assert note.index("## 英文版") < note.index("Anthropic Source Leak")
 
 
 def test_render_topic_reference_note_compacts_multiline_signal_text_for_readability():
