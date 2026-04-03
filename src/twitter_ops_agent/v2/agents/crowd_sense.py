@@ -24,6 +24,14 @@ class CrowdSenseAgent:
         ][:signal_limit]
         if not filtered:
             return summary
+        if getattr(self.crowd_context, "summarizer", None) is not None:
+            return CrowdSummary(
+                sentiment_summary=summary.sentiment_summary,
+                key_points=summary.key_points,
+                suggested_angles=summary.suggested_angles,
+                top_signals=tuple(filtered),
+                source_label=summary.source_label,
+            )
         rebuilt = heuristic_crowd_summary(
             seed_text=seed.source_text,
             thread=[],

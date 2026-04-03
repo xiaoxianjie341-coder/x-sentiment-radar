@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Sentiment-first X topic radar for AI and Crypto operators."
 readme = "README.md"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = ["twscrape>=0.17.0"]
 
 [project.scripts]
 twitter-ops-agent = "twitter_ops_agent.cli:main"

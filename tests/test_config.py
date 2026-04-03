@@ -18,6 +18,17 @@ def test_load_settings_defaults_obsidian_contract():
     assert settings.writer_model == ""
     assert settings.writer_api_mode == "responses"
     assert settings.attentionvc_api_key == ""
+    assert settings.xhunt_base_url == "https://trends.xhunt.ai"
+    assert settings.xhunt_group == "cn"
+    assert settings.xhunt_groups == ("cn", "global")
+    assert settings.xhunt_hours == 24
+    assert settings.xhunt_limit == 15
+    assert settings.xhunt_min_views == 1000
+    assert settings.xhunt_min_likes == 10
+    assert settings.twscrape_search_enabled is False
+    assert settings.twscrape_x_client_transaction_id == ""
+    assert settings.x_session_cookie_header == ""
+    assert settings.x_session_x_client_transaction_id == ""
     assert settings.attentionvc_categories == ("ai", "crypto")
     assert settings.attentionvc_use_rising is True
     assert settings.attentionvc_search_queries == ("anthropic", "openai", "solana")
@@ -116,3 +127,45 @@ def test_load_settings_supports_attentionvc_env_overrides():
     assert settings.attentionvc_signal_min_views == 80
     assert settings.attentionvc_signal_min_likes == 2
     assert settings.attentionvc_signal_min_replies == 2
+
+
+def test_load_settings_supports_xhunt_env_overrides():
+    settings = load_settings(
+        config_path=None,
+        env={
+            "TWITTER_OPS_AGENT_XHUNT_BASE_URL": "https://mirror.example.com",
+            "TWITTER_OPS_AGENT_XHUNT_GROUPS": "cn,global",
+            "TWITTER_OPS_AGENT_XHUNT_HOURS": "24",
+            "TWITTER_OPS_AGENT_XHUNT_LIMIT": "6",
+            "TWITTER_OPS_AGENT_XHUNT_MIN_VIEWS": "5000",
+            "TWITTER_OPS_AGENT_XHUNT_MIN_LIKES": "100",
+            "TWITTER_OPS_AGENT_TWSCRAPE_SEARCH_ENABLED": "true",
+            "TWITTER_OPS_AGENT_TWSCRAPE_X_CLIENT_TRANSACTION_ID": "abc123",
+            "TWITTER_OPS_AGENT_X_SESSION_COOKIE_HEADER": "auth_token=demo; ct0=demo",
+            "TWITTER_OPS_AGENT_X_SESSION_X_CLIENT_TRANSACTION_ID": "browser123",
+        },
+    )
+
+    assert settings.xhunt_base_url == "https://mirror.example.com"
+    assert settings.xhunt_group == "cn"
+    assert settings.xhunt_groups == ("cn", "global")
+    assert settings.xhunt_hours == 24
+    assert settings.xhunt_limit == 6
+    assert settings.xhunt_min_views == 5000
+    assert settings.xhunt_min_likes == 100
+    assert settings.twscrape_search_enabled is True
+    assert settings.twscrape_x_client_transaction_id == "abc123"
+    assert settings.x_session_cookie_header == "auth_token=demo; ct0=demo"
+    assert settings.x_session_x_client_transaction_id == "browser123"
+
+
+def test_load_settings_backfills_xhunt_groups_from_legacy_single_group_override():
+    settings = load_settings(
+        config_path=None,
+        env={
+            "TWITTER_OPS_AGENT_XHUNT_GROUP": "global",
+        },
+    )
+
+    assert settings.xhunt_group == "global"
+    assert settings.xhunt_groups == ("global",)

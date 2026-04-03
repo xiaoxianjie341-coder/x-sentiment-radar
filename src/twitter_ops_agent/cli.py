@@ -10,9 +10,12 @@ from zoneinfo import ZoneInfo
 
 from twitter_ops_agent.config import load_settings, resolve_config_path
 from twitter_ops_agent.discovery.attentionvc import AttentionVCArticleClient
+from twitter_ops_agent.discovery.xhunt import XHuntScoutAgent, XHuntTrendClient
 from twitter_ops_agent.doctor import run_doctor
 from twitter_ops_agent.events.linker import EventService
+from twitter_ops_agent.research.browser_x_client import BrowserXSessionCrowdClient
 from twitter_ops_agent.research.crowd_context import CrowdContextService, LLMCrowdSummarizer
+from twitter_ops_agent.research.twscrape_client import TwscrapeCrowdClient
 from twitter_ops_agent.storage.repository import SqliteRepository
 from twitter_ops_agent.v2.agents.angle_synthesizer import AngleSynthesizerAgent
 from twitter_ops_agent.v2.agents.crowd_sense import CrowdSenseAgent
@@ -93,35 +96,13 @@ class SystemClock:
 
 def run_v2(settings):
     repo = SqliteRepository(settings.sqlite_db)
-    attention_client = build_attention_client(settings)
-    if attention_client is None:
-        raise RuntimeError("AttentionVC API key is required for run-v2.")
-
+    runtime = build_v2_runtime(settings, repo)
     orchestrator = V2Orchestrator(
-        scout=TopicScoutAgent(
-            client=attention_client,
-            categories=settings.attentionvc_categories,
-            article_window=settings.attentionvc_window,
-            article_limit_per_category=settings.attentionvc_limit_per_category,
-            use_rising_articles=settings.attentionvc_use_rising,
-            rising_hours=settings.attentionvc_rising_hours,
-            search_queries=settings.attentionvc_search_queries,
-            search_limit_per_query=settings.attentionvc_search_limit_per_query,
-            source_mode=settings.attentionvc_source_mode,
-            seed_min_views=settings.attentionvc_seed_min_views,
-            seed_min_likes=settings.attentionvc_seed_min_likes,
-            seed_min_replies=settings.attentionvc_seed_min_replies,
-            article_min_views=settings.attentionvc_article_min_views,
-            article_min_likes=settings.attentionvc_article_min_likes,
-            article_min_replies=settings.attentionvc_article_min_replies,
-            tweet_min_views=settings.attentionvc_tweet_min_views,
-            tweet_min_likes=settings.attentionvc_tweet_min_likes,
-            tweet_min_replies=settings.attentionvc_tweet_min_replies,
-        ),
-        hydration=HydrationAgent(repo=repo, events=EventService(repo)),
+        scout=runtime["scout"],
+        hydration=runtime["hydration"],
         priority_gate=PriorityGateAgent(daily_budget=settings.daily_candidate_budget),
         crowd_sense=CrowdSenseAgent(
-            crowd_context=build_crowd_context_service(settings, attention_client=attention_client),
+            crowd_context=build_crowd_context_service(settings, client=runtime["crowd_client"]),
             signal_min_views=settings.attentionvc_signal_min_views,
             signal_min_likes=settings.attentionvc_signal_min_likes,
             signal_min_replies=settings.attentionvc_signal_min_replies,
@@ -131,11 +112,63 @@ def run_v2(settings):
         snapshot_store=repo,
     )
 
-    last_seen = repo.read_run_state("last_seen_attention_v2_ids")
+    last_seen = repo.read_run_state(runtime["state_key"])
     report = orchestrator.run(day_key=_local_day_key(settings), last_seen=last_seen)
     if report.next_seen_state:
-        repo.mark_batch_run("last_seen_attention_v2_ids", report.next_seen_state)
+        repo.mark_batch_run(runtime["state_key"], report.next_seen_state)
     return report
+
+
+def build_v2_runtime(settings, repo):
+    attention_client = build_attention_client(settings)
+    if attention_client is not None:
+        return {
+            "source_name": "attentionvc",
+            "state_key": "last_seen_attention_v2_ids",
+            "scout": TopicScoutAgent(
+                client=attention_client,
+                categories=settings.attentionvc_categories,
+                article_window=settings.attentionvc_window,
+                article_limit_per_category=settings.attentionvc_limit_per_category,
+                use_rising_articles=settings.attentionvc_use_rising,
+                rising_hours=settings.attentionvc_rising_hours,
+                search_queries=settings.attentionvc_search_queries,
+                search_limit_per_query=settings.attentionvc_search_limit_per_query,
+                source_mode=settings.attentionvc_source_mode,
+                seed_min_views=settings.attentionvc_seed_min_views,
+                seed_min_likes=settings.attentionvc_seed_min_likes,
+                seed_min_replies=settings.attentionvc_seed_min_replies,
+                article_min_views=settings.attentionvc_article_min_views,
+                article_min_likes=settings.attentionvc_article_min_likes,
+                article_min_replies=settings.attentionvc_article_min_replies,
+                tweet_min_views=settings.attentionvc_tweet_min_views,
+                tweet_min_likes=settings.attentionvc_tweet_min_likes,
+                tweet_min_replies=settings.attentionvc_tweet_min_replies,
+            ),
+            "hydration": HydrationAgent(repo=repo, events=EventService(repo)),
+            "crowd_client": attention_client,
+        }
+
+    browser_client = build_browser_x_session_client(settings)
+    if browser_client is not None:
+        return {
+            "source_name": "xhunt+browser-session",
+            "state_key": "last_seen_xhunt_v2_ids",
+            "scout": build_xhunt_scout(settings),
+            "hydration": HydrationAgent(repo=repo, events=EventService(repo), source_fetcher=browser_client),
+            "crowd_client": browser_client,
+        }
+
+    crowd_client = build_twscrape_crowd_client(settings)
+    if crowd_client is None:
+        raise RuntimeError("run-v2 requires AttentionVC, a browser-backed X session, or a working twscrape install.")
+    return {
+        "source_name": "xhunt+twscrape",
+        "state_key": "last_seen_xhunt_v2_ids",
+        "scout": build_xhunt_scout(settings),
+        "hydration": HydrationAgent(repo=repo, events=EventService(repo), source_fetcher=crowd_client),
+        "crowd_client": crowd_client,
+    }
 
 
 def build_attention_client(settings):
@@ -147,8 +180,8 @@ def build_attention_client(settings):
     )
 
 
-def build_crowd_context_service(settings, attention_client=None):
-    client = attention_client or build_attention_client(settings)
+def build_crowd_context_service(settings, client=None):
+    client = client or build_attention_client(settings)
     if client is None:
         return None
 
@@ -170,6 +203,39 @@ def build_crowd_context_service(settings, attention_client=None):
         reply_sample_limit=settings.attentionvc_reply_sample_limit,
         top_signal_count=settings.attentionvc_top_signal_count,
         summarizer=summarizer,
+    )
+
+
+def build_xhunt_client(settings):
+    return XHuntTrendClient(base_url=settings.xhunt_base_url)
+
+
+def build_xhunt_scout(settings):
+    return XHuntScoutAgent(
+        client=build_xhunt_client(settings),
+        groups=settings.xhunt_groups,
+        hours=settings.xhunt_hours,
+        limit=settings.xhunt_limit,
+        min_views=settings.xhunt_min_views,
+        min_likes=settings.xhunt_min_likes,
+    )
+
+
+def build_twscrape_crowd_client(settings):
+    return TwscrapeCrowdClient.from_db(
+        settings.twscrape_db,
+        search_enabled=settings.twscrape_search_enabled,
+        x_client_transaction_id=settings.twscrape_x_client_transaction_id,
+    )
+
+
+def build_browser_x_session_client(settings):
+    if not settings.x_session_cookie_header or not settings.x_session_x_client_transaction_id:
+        return None
+    return BrowserXSessionCrowdClient(
+        cookie_header=settings.x_session_cookie_header,
+        x_client_transaction_id=settings.x_session_x_client_transaction_id,
+        user_agent=settings.x_session_user_agent,
     )
 
 

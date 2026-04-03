@@ -105,3 +105,22 @@ def test_render_radar_note_links_to_topic_and_viewpoints():
     assert "https://x.com/example/status/1" in note
     assert "[[01_主题参考/2026-04-01 [AI] Anthropic Source Leak]]" in note
     assert "[[02_可借用观点/2026-04-01 [AI] Anthropic Source Leak]]" in note
+
+
+def test_render_topic_reference_note_compacts_multiline_signal_text_for_readability():
+    item = _item()
+    item.crowd_summary.top_signals = (
+        _signal(
+            99,
+            "@Murphychen888 同意以下6点：\n1.CVDD 是少数长期有效的指标\n2.当前策略：等待 + 轻仓\n3.底部区域：$45,000-55,000",
+            likes=8,
+            replies=1,
+            views=1800,
+        ),
+    )
+
+    note = render_topic_reference_note(item)
+
+    assert "@Murphychen888 同意以下6点" not in note
+    assert "当前策略：等待 + 轻仓" in note
+    assert "1.CVDD 是少数长期有效的指标" not in note
