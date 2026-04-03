@@ -153,3 +153,73 @@ def test_crowd_sense_agent_caps_output_to_top_signal_count():
     result = CrowdSenseAgent(crowd_context=VerboseCrowdContext()).run(seed)
 
     assert len(result.top_signals) == 10
+
+
+def test_crowd_sense_agent_preserves_llm_summary_when_present():
+    class LLMCrowdContext:
+        top_signal_count = 10
+        summarizer = object()
+
+        def build(self, *, tweet_id: str, seed_text: str):
+            return CrowdSummary(
+                sentiment_summary="评论区整体偏谨慎认同，但也有明显质疑，大家更关心信号是否能单独定性熊市。",
+                key_points=("很多人关心后半段会持续多久。",),
+                suggested_angles=("可以从单一指标是否足够切入。",),
+                top_signals=(
+                    CrowdSignal(
+                        tweet_id="1",
+                        author_handle="btc_tigerx",
+                        author_name="btc_tigerx",
+                        text="昨天的drift被盗就可以证明了，熊市进程过半进入了中后期了，深熊特征之一",
+                        url="https://x.com/btc_tigerx/status/1",
+                        likes=11,
+                        replies=3,
+                        views=2710,
+                        bookmarks=0,
+                        signal_score=80.0,
+                        source_type="reply",
+                    ),
+                    CrowdSignal(
+                        tweet_id="2",
+                        author_handle="Leon13617912",
+                        author_name="Leon13617912",
+                        text="同意以下6点： 1.CVDD 是少数长期有效的指标 2.当前策略：等待 + 轻仓",
+                        url="https://x.com/leon/status/2",
+                        likes=1,
+                        replies=1,
+                        views=886,
+                        bookmarks=0,
+                        signal_score=20.0,
+                        source_type="reply",
+                    ),
+                ),
+                source_label="评论区",
+            )
+
+    seed = HydratedSeed(
+        seed=ScoutSeed(
+            seed_id="seed-1",
+            source_kind="tweet",
+            query="btc",
+            tweet_id="tweet-1",
+            url="https://x.com/example/status/1",
+            text="BTC signal thread.",
+            title="BTC signal thread.",
+            track="Crypto",
+            author_handle="murphy",
+            views=80000,
+            replies=60,
+            likes=500,
+            velocity_hint=100.0,
+        ),
+        event_id="event-1",
+        source_url="https://x.com/example/status/1",
+        source_text="BTC signal thread.",
+        track="Crypto",
+    )
+
+    result = CrowdSenseAgent(crowd_context=LLMCrowdContext()).run(seed)
+
+    assert result.sentiment_summary.startswith("评论区整体偏谨慎认同")
+    assert result.key_points == ("很多人关心后半段会持续多久。",)
+    assert len(result.top_signals) == 2

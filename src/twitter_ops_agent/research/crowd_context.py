@@ -1,14 +1,60 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+import re
+from dataclasses import dataclass
 
 from twitter_ops_agent.discovery.attentionvc import AttentionTweet, AttentionVCArticleClient, build_search_query
 from twitter_ops_agent.domain.models import CrowdSignal, CrowdSummary
 from twitter_ops_agent.writer.llm_writer import LLMWriterConfig, call_openai_compatible_api
 
-SKEPTICAL_MARKERS = ("scam", "fake", "cope", "doubt", "why", "risk", "质疑", "怀疑", "割", "泡沫", "风险")
-FEAR_MARKERS = ("fear", "panic", "dump", "crash", "bear", "担心", "恐慌", "暴跌", "害怕")
+SKEPTICAL_MARKERS = (
+    "scam",
+    "fake",
+    "cope",
+    "doubt",
+    "why",
+    "真的假的",
+    "求证",
+    "证据",
+    "依据",
+    "质疑",
+    "怀疑",
+    "泡沫",
+)
+FEAR_MARKERS = (
+    "fear",
+    "panic",
+    "dump",
+    "crash",
+    "bear",
+    "bearish",
+    "bear market",
+    "risk",
+    "drawdown",
+    "担心",
+    "恐慌",
+    "暴跌",
+    "害怕",
+    "风险",
+    "熊市",
+    "深熊",
+    "回调",
+    "下跌",
+    "跌幅",
+    "插针",
+    "轻仓",
+    "减仓",
+    "观望",
+    "等待",
+    "底部",
+    "底部区域",
+    "见底",
+    "横盘",
+    "破位",
+    "利空",
+    "空头",
+)
 POSITIVE_MARKERS = ("bull", "long", "buy", "good", "great", "alpha", "机会", "看多", "利好", "牛", "冲")
 EMOTION_ORDER = ("质疑/求证", "担忧/风险", "兴奋/机会", "中性/信息补充")
 
@@ -225,6 +271,7 @@ def classify_signal_emotion(text: str) -> str:
     skeptical_score = sum(1 for token in SKEPTICAL_MARKERS if token in lowered)
     fear_score = sum(1 for token in FEAR_MARKERS if token in lowered)
     positive_score = sum(1 for token in POSITIVE_MARKERS if token in lowered)
+    fear_score += _score_crypto_risk_patterns(lowered)
 
     if skeptical_score >= fear_score and skeptical_score >= positive_score and skeptical_score > 0:
         return "质疑/求证"
@@ -270,10 +317,27 @@ def _merge_signals(
 
 
 def _compress_signal_text(text: str) -> str:
-    compact = " ".join(text.split())
+    compact = compact_signal_text(text, limit=120)
     if len(compact) <= 120:
         return compact
     return compact[:117] + "..."
+
+
+def compact_signal_text(text: str, *, limit: int = 160) -> str:
+    compact = " ".join(text.split())
+    compact = re.sub(r"^(?:@\w+\s+)+", "", compact)
+    compact = re.sub(r"https?://\S+", "", compact)
+    compact = re.sub(r"(?<!\w)(?:\d+[.)]|[-*])\s*", "", compact)
+    compact = re.sub(r"\s+", " ", compact).strip(" -:;，。")
+    if len(compact) <= limit:
+        return compact
+    trimmed = compact[:limit]
+    for separator in ("。", "；", "，", ". ", "; ", ", ", " "):
+        idx = trimmed.rfind(separator)
+        if idx >= int(limit * 0.6):
+            trimmed = trimmed[:idx]
+            break
+    return trimmed.rstrip(" -:;，。") + "..."
 
 
 def _parse_summary_output(raw_text: str) -> dict[str, tuple[str, ...] | str]:
@@ -320,3 +384,16 @@ def _filter_related_discussion(seed_text: str, tweets: list[AttentionTweet]) -> 
 
 def _contains_cjk(text: str) -> bool:
     return any("\u4e00" <= char <= "\u9fff" for char in text)
+
+
+def _score_crypto_risk_patterns(lowered: str) -> int:
+    score = 0
+    if "跌" in lowered and "%" in lowered:
+        score += 1
+    if any(token in lowered for token in ("等待 + 轻仓", "等待+轻仓", "当前策略：等待", "当前策略:等待")):
+        score += 2
+    if any(token in lowered for token in ("底部区域", "见底", "5字开头", "破5", "插针到")):
+        score += 1
+    if any(token in lowered for token in ("深熊特征", "熊市后半段", "熊市进程", "回调到", "最大跌幅")):
+        score += 2
+    return score

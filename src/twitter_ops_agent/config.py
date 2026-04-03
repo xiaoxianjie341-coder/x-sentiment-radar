@@ -14,6 +14,9 @@ DEFAULT_TIMEZONE = "Asia/Shanghai"
 DEFAULT_DAILY_CANDIDATE_BUDGET = 20
 DEFAULT_BATCH_MODE = "manual_or_cron"
 DEFAULT_CONFIG_RELATIVE_PATH = Path("config/settings.toml")
+DEFAULT_XHUNT_GROUPS = ("cn", "global")
+DEFAULT_XHUNT_HOURS = 24
+DEFAULT_XHUNT_LIMIT = 15
 ENV_PREFIX = "TWITTER_OPS_AGENT_"
 
 
@@ -29,8 +32,20 @@ class AppSettings:
     high_signal_source_handles: tuple[str, ...]
     twscrape_db: Path
     twscrape_expected_login: str
+    twscrape_search_enabled: bool
+    twscrape_x_client_transaction_id: str
     x_fetcher_script: Path
     x_fetcher_browser: str
+    xhunt_base_url: str
+    xhunt_group: str
+    xhunt_groups: tuple[str, ...]
+    xhunt_hours: int
+    xhunt_limit: int
+    xhunt_min_views: int
+    xhunt_min_likes: int
+    x_session_cookie_header: str
+    x_session_x_client_transaction_id: str
+    x_session_user_agent: str
     sqlite_db: Path
     writer_base_url: str
     writer_api_key: str
@@ -77,8 +92,20 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "high_signal_source_handles": (),
         "twscrape_db": project_root / "data/twscrape/accounts.db",
         "twscrape_expected_login": DEFAULT_RESEARCH_LOGIN,
+        "twscrape_search_enabled": False,
+        "twscrape_x_client_transaction_id": "",
         "x_fetcher_script": project_root / "scripts/x-tweet-fetcher.py",
         "x_fetcher_browser": "camofox",
+        "xhunt_base_url": "https://trends.xhunt.ai",
+        "xhunt_group": DEFAULT_XHUNT_GROUPS[0],
+        "xhunt_groups": DEFAULT_XHUNT_GROUPS,
+        "xhunt_hours": DEFAULT_XHUNT_HOURS,
+        "xhunt_limit": DEFAULT_XHUNT_LIMIT,
+        "xhunt_min_views": 1000,
+        "xhunt_min_likes": 10,
+        "x_session_cookie_header": "",
+        "x_session_x_client_transaction_id": "",
+        "x_session_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36",
         "sqlite_db": project_root / "data/twitter_ops_agent.sqlite3",
         "writer_base_url": "",
         "writer_api_key": "",
@@ -111,10 +138,15 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "attentionvc_signal_min_replies": 0,
     }
 
+    config_values: dict[str, Any] = {}
     if config_path is not None:
-        values.update(_load_config_file(config_path, project_root))
+        config_values = _load_config_file(config_path, project_root)
+        values.update(config_values)
 
-    values.update(_load_env_overrides(env or {}, project_root))
+    env_overrides = _load_env_overrides(env or {}, project_root)
+    values.update(env_overrides)
+    values["xhunt_groups"] = _resolve_xhunt_groups(config_values=config_values, env_overrides=env_overrides)
+    values["xhunt_group"] = values["xhunt_groups"][0]
 
     obsidian_vault = _coerce_path(values["obsidian_vault"], project_root)
     obsidian_root = _coerce_path(
@@ -133,8 +165,20 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         high_signal_source_handles=tuple(str(item) for item in values["high_signal_source_handles"]),
         twscrape_db=_coerce_path(values["twscrape_db"], project_root),
         twscrape_expected_login=str(values["twscrape_expected_login"]),
+        twscrape_search_enabled=bool(values["twscrape_search_enabled"]),
+        twscrape_x_client_transaction_id=str(values["twscrape_x_client_transaction_id"]),
         x_fetcher_script=_coerce_path(values["x_fetcher_script"], project_root),
         x_fetcher_browser=str(values["x_fetcher_browser"]),
+        xhunt_base_url=str(values["xhunt_base_url"]),
+        xhunt_group=str(values["xhunt_group"]),
+        xhunt_groups=tuple(str(item) for item in values["xhunt_groups"]),
+        xhunt_hours=int(values["xhunt_hours"]),
+        xhunt_limit=int(values["xhunt_limit"]),
+        xhunt_min_views=int(values["xhunt_min_views"]),
+        xhunt_min_likes=int(values["xhunt_min_likes"]),
+        x_session_cookie_header=str(values["x_session_cookie_header"]),
+        x_session_x_client_transaction_id=str(values["x_session_x_client_transaction_id"]),
+        x_session_user_agent=str(values["x_session_user_agent"]),
         sqlite_db=_coerce_path(values["sqlite_db"], project_root),
         writer_base_url=str(values["writer_base_url"]),
         writer_api_key=str(values["writer_api_key"]),
@@ -205,12 +249,16 @@ def _load_env_overrides(env: Mapping[str, str], base_dir: Path) -> dict[str, Any
         value = env[env_name]
         if field_name == "daily_candidate_budget":
             overrides[field_name] = int(value)
-        elif field_name in {"high_signal_source_handles", "attentionvc_categories", "attentionvc_search_queries"}:
+        elif field_name in {"high_signal_source_handles", "attentionvc_categories", "attentionvc_search_queries", "xhunt_groups"}:
             overrides[field_name] = _coerce_str_tuple(value)
         elif field_name in {
             "attentionvc_limit_per_category",
             "attentionvc_rising_hours",
             "attentionvc_search_limit_per_query",
+            "xhunt_hours",
+            "xhunt_limit",
+            "xhunt_min_views",
+            "xhunt_min_likes",
             "attentionvc_seed_min_views",
             "attentionvc_seed_min_likes",
             "attentionvc_seed_min_replies",
@@ -227,7 +275,7 @@ def _load_env_overrides(env: Mapping[str, str], base_dir: Path) -> dict[str, Any
             "attentionvc_signal_min_replies",
         }:
             overrides[field_name] = int(value)
-        elif field_name == "attentionvc_use_rising":
+        elif field_name in {"attentionvc_use_rising", "twscrape_search_enabled"}:
             overrides[field_name] = _coerce_bool(value)
         elif field_name in {"obsidian_vault", "obsidian_root", "twscrape_db", "x_fetcher_script", "sqlite_db"}:
             overrides[field_name] = _coerce_path(value, base_dir)
@@ -243,12 +291,44 @@ def _normalize_values(raw: Mapping[str, Any], base_dir: Path) -> dict[str, Any]:
     for key, value in raw.items():
         if key in {"obsidian_vault", "obsidian_root", "twscrape_db", "x_fetcher_script", "sqlite_db"}:
             normalized[key] = _coerce_path(value, base_dir)
-        elif key in {"high_signal_source_handles", "attentionvc_categories", "attentionvc_search_queries"}:
+        elif key in {"high_signal_source_handles", "attentionvc_categories", "attentionvc_search_queries", "xhunt_groups"}:
             normalized[key] = _coerce_str_tuple(value)
         else:
             normalized[key] = value
 
     return normalized
+
+
+def _resolve_xhunt_groups(
+    *,
+    config_values: Mapping[str, Any],
+    env_overrides: Mapping[str, Any],
+) -> tuple[str, ...]:
+    for values, plural_key, singular_key in (
+        (env_overrides, "xhunt_groups", "xhunt_group"),
+        (config_values, "xhunt_groups", "xhunt_group"),
+    ):
+        groups = _groups_from_mapping(values, plural_key=plural_key, singular_key=singular_key)
+        if groups:
+            return groups
+    return DEFAULT_XHUNT_GROUPS
+
+
+def _groups_from_mapping(
+    values: Mapping[str, Any],
+    *,
+    plural_key: str,
+    singular_key: str,
+) -> tuple[str, ...]:
+    if plural_key in values:
+        groups = _coerce_str_tuple(values[plural_key])
+        if groups:
+            return groups
+    if singular_key in values:
+        group = str(values[singular_key]).strip()
+        if group:
+            return (group,)
+    return ()
 
 
 def _coerce_path(value: Any, base_dir: Path) -> Path:

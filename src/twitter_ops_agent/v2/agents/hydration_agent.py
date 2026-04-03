@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from twitter_ops_agent.domain.models import Account, CaptureResult, Post, utc_now
 from twitter_ops_agent.events.linker import EventService
+from twitter_ops_agent.filter.track import classify_track
 from twitter_ops_agent.storage.repository import SqliteRepository
 from twitter_ops_agent.v2.contracts import HydratedSeed, ScoutSeed
 
@@ -12,11 +13,13 @@ from twitter_ops_agent.v2.contracts import HydratedSeed, ScoutSeed
 class HydrationAgent:
     repo: SqliteRepository
     events: EventService
+    source_fetcher: object | None = None
 
     def run(self, seeds: list[ScoutSeed]) -> list[HydratedSeed]:
         if not seeds:
             return []
-        captures = [self._capture_from_seed(seed) for seed in seeds]
+        hydrated_seeds = [self._hydrate_seed(seed) for seed in seeds]
+        captures = [self._capture_from_seed(seed) for seed in hydrated_seeds]
         for capture in captures:
             self.repo.save_capture_result(capture)
         event_context = self.repo.load_event_context(
@@ -33,8 +36,32 @@ class HydrationAgent:
                 source_text=item.capture.target_post.text_exact,
                 track=item.capture.target_post.track,
             )
-            for seed, item in zip(seeds, linked, strict=True)
+            for seed, item in zip(hydrated_seeds, linked, strict=True)
         ]
+
+    def _hydrate_seed(self, seed: ScoutSeed) -> ScoutSeed:
+        if self.source_fetcher is None or not hasattr(self.source_fetcher, "tweet_details"):
+            return seed
+        detail = self.source_fetcher.tweet_details(tweet_id=seed.tweet_id)
+        if detail is None:
+            return seed
+        text = detail.text.strip() or seed.text
+        track = seed.track or classify_track(text, detail.author_handle)
+        return ScoutSeed(
+            seed_id=seed.seed_id,
+            source_kind=seed.source_kind,
+            query=seed.query,
+            tweet_id=seed.tweet_id,
+            url=detail.url or seed.url,
+            text=text,
+            title=" ".join(text.split())[:120] or seed.title,
+            track=track,
+            author_handle=detail.author_handle or seed.author_handle,
+            views=detail.views,
+            replies=detail.replies,
+            likes=detail.likes,
+            velocity_hint=seed.velocity_hint,
+        )
 
     def _capture_from_seed(self, seed: ScoutSeed) -> CaptureResult:
         account = Account(

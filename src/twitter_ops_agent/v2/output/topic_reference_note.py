@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from twitter_ops_agent.research.crowd_context import group_signals_by_emotion, summarize_signal_emotions
+from twitter_ops_agent.research.crowd_context import compact_signal_text, group_signals_by_emotion, summarize_signal_emotions
 from twitter_ops_agent.v2.contracts import TopicWorkspaceItem
 
 MAX_RENDERED_SIGNALS = 10
@@ -51,7 +51,7 @@ def _render_top_signals(item: TopicWorkspaceItem) -> str:
     for index, signal in enumerate(item.crowd_summary.top_signals[:MAX_RENDERED_SIGNALS], start=1):
         lines.append(
             f"- {index}. @{signal.author_handle} | 赞 {signal.likes} | 回 {signal.replies} | 浏览 {signal.views}\n"
-            f"  {signal.text}\n"
+            f"  {compact_signal_text(signal.text, limit=180)}\n"
             f"  {signal.url}"
         )
     return "\n".join(lines) + "\n"
@@ -79,7 +79,7 @@ def _render_grouped_signals(item: TopicWorkspaceItem) -> str:
         for signal in signals:
             sections.append(
                 f"- @{signal.author_handle} | 赞 {signal.likes} | 回 {signal.replies} | 浏览 {signal.views}\n"
-                f"  {signal.text}\n"
+                f"  {compact_signal_text(signal.text, limit=160)}\n"
                 f"  {signal.url}"
             )
         sections.append("")

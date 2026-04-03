@@ -24,7 +24,7 @@
 
 - `doctor`：检查当前解析到的 `obsidian_root` 和 `sqlite_db`
 - `run-v2`：执行完整的主题发现和写入流程
-- 基于 `AttentionVC` 做主题发现
+- 支持 `AttentionVC` 或 `XHunt + twscrape` 做主题发现和原帖补全
 - 支持 `article / tweet / related discussion` 多来源补充
 - 每个主题最多抓 `100` 条回复样本
 - 默认尽量保留 `10` 条评论用于输出
@@ -44,7 +44,9 @@
 要求：
 
 - `Python >= 3.14`
-- 一个可用的 `AttentionVC API key`
+- 二选一：
+  - 一个可用的 `AttentionVC API key`
+  - 或一个可用的 `twscrape` 账号池 / cookies
 - 一个你想写入的 `Obsidian` 路径
 
 推荐安装方式：
@@ -65,6 +67,12 @@ twitter-ops-agent doctor
 twitter-ops-agent run-v2
 ```
 
+如果你已经配好了本地浏览器会话，想直接跑免费的 `XHunt + browser-session` 链路，也可以直接用：
+
+```bash
+./scripts/run-xhunt-free.sh
+```
+
 ### 第一次配置
 
 先复制配置文件：
@@ -79,35 +87,32 @@ cp config/settings.example.toml config/settings.toml
 obsidian_vault = "/absolute/path/to/Obsidian Vault"
 obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 
-attentionvc_api_key = "avc_..."
-attentionvc_base_url = "https://api.attentionvc.ai"
-
 sqlite_db = "/absolute/path/to/your/sqlite.sqlite3"
 ```
 
-如果你想按当前仓库的推荐默认值启动，配置建议是：
+免费低风控模式推荐这样配：
 
 ```toml
-attentionvc_categories = ["ai", "crypto"]
-attentionvc_source_mode = "articles_only"
-attentionvc_use_rising = true
-attentionvc_search_queries = ["anthropic", "openai", "solana"]
-attentionvc_search_limit_per_query = 3
+twscrape_db = "data/twscrape/accounts.db"
+twscrape_search_enabled = false
 
-attentionvc_article_min_views = 2000
-attentionvc_article_min_likes = 20
-attentionvc_article_min_replies = 5
+xhunt_groups = ["cn", "global"]
+xhunt_hours = 24
+xhunt_limit = 15
+xhunt_min_views = 1000
+xhunt_min_likes = 10
 
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
-attentionvc_tweet_min_replies = 3
-
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
+```
 
-attentionvc_signal_min_views = 0
-attentionvc_signal_min_likes = 0
-attentionvc_signal_min_replies = 0
+如果你想继续用付费模式，再补：
+
+```toml
+attentionvc_api_key = "avc_..."
+attentionvc_base_url = "https://api.attentionvc.ai"
 ```
 
 ### 最重要的配置项说明
@@ -124,12 +129,21 @@ attentionvc_signal_min_replies = 0
 
 - `sqlite_db`
   - 本地状态数据库
-  - 这里会保存 `last_seen_attention_v2_ids`
+  - 这里会保存 `last_seen_attention_v2_ids` 或 `last_seen_xhunt_v2_ids`
   - 如果你想重新模拟“第一次运行”，请换一个新的 `sqlite_db` 路径
 
-- `attentionvc_api_key`
-  - 必填
-  - 需要真实可用并且有 credits 的 key
+- `twscrape_db`
+  - `twscrape` 的账号池数据库
+  - 免费模式下 `run-v2` 会从这里读取账号 / cookies
+
+- `twscrape_search_enabled = false`
+  - 默认关闭关键词搜索 fallback
+  - 这样更低风控，只做“原帖详情 + 顶层回复”抓取
+
+- `xhunt_*`
+  - 免费模式的发现入口
+  - 默认会同时抓 `cn + global` 两个榜单
+  - 每个榜单都会取过去 `24h` 的前 `15` 条，再用 `twscrape` 补原帖全文和回复
 
 - `attentionvc_source_mode`
   - `"articles_only"`：只抓文章型主题。第一次使用最稳
@@ -142,6 +156,7 @@ attentionvc_signal_min_replies = 0
 
 - `attentionvc_reply_sample_limit = 100`
   - 每个主题最多抓 `100` 条回复样本
+  - 对 `twscrape` 低风控模式，推荐先降到 `20-30`
 
 - `attentionvc_top_signal_count = 10`
   - 最终尽量保留 `10` 条评论用于输出
@@ -224,9 +239,14 @@ twitter-ops-agent run-v2
   - 推荐直接使用 `twitter-ops-agent ...`
 
 - `attentionvc_api_key` 不可用
-  - 空 key 会直接报错
+  - 现在不是必填
+  - 如果配置了空 key，不会报错，但会回退到 `XHunt + twscrape`
   - 没 credits 会返回 `402`
   - 请求太密会返回 `429`
+
+- `twscrape` 账号池没有准备好
+  - 免费模式下会直接报错
+  - 推荐先确认 `accounts.db` 里有可用 cookies
 
 - `obsidian_root` 配到了一个你当前 Obsidian 没打开的目录
   - 文件其实已经写到磁盘上了
@@ -237,10 +257,11 @@ twitter-ops-agent run-v2
 
 ### 当前限制
 
-- 主题发现目前仍然更偏 `article-first`
+- `XHunt` 目前走的是公共页面解析，不是官方 API
+- 免费模式下 `twscrape` 默认只抓原帖详情和顶层回复，不主动放大搜索面
 - tweet 侧“正在起势”不是平台现成信号，而是本地排序近似
-- `doctor` 目前主要检查路径，不会提前帮你验证 `AttentionVC` credits 或 rate limit
-- 大批量跑时可能会撞到 `AttentionVC` 的每分钟请求限制
+- `doctor` 目前主要检查路径，不会提前帮你验证 `AttentionVC` credits 或 `twscrape` 账号健康
+- 大批量跑时可能会撞到 `AttentionVC` 或 `twscrape` 的各自限制
 
 ---
 
@@ -268,7 +289,7 @@ It **is**:
 
 - `doctor` command to inspect resolved `obsidian_root` and `sqlite_db`
 - `run-v2` command for the full workflow
-- AttentionVC-powered topic discovery
+- supports `AttentionVC` or `XHunt + twscrape` for discovery and source hydration
 - reply / thread / related-discussion enrichment
 - up to `100` reply samples per topic
 - keep up to `10` comments for output by default
@@ -288,7 +309,9 @@ It **is**:
 Requirements:
 
 - `Python >= 3.14`
-- a working `AttentionVC API key`
+- either:
+  - a working `AttentionVC API key`
+  - or a prepared `twscrape` account pool / cookies
 - an `Obsidian` path you want to write into
 
 Recommended setup:
@@ -309,6 +332,12 @@ twitter-ops-agent doctor
 twitter-ops-agent run-v2
 ```
 
+If your local browser session is already configured and you want the free `XHunt + browser-session` path directly, you can also run:
+
+```bash
+./scripts/run-xhunt-free.sh
+```
+
 ### First-Time Config
 
 Copy the example config:
@@ -323,35 +352,33 @@ At minimum, set:
 obsidian_vault = "/absolute/path/to/Obsidian Vault"
 obsidian_root = "/absolute/path/to/Obsidian Vault/推特运营Agent"
 
-attentionvc_api_key = "avc_..."
-attentionvc_base_url = "https://api.attentionvc.ai"
-
 sqlite_db = "/absolute/path/to/your/sqlite.sqlite3"
 ```
 
-Recommended current defaults:
+Recommended free low-risk mode:
 
 ```toml
-attentionvc_categories = ["ai", "crypto"]
-attentionvc_source_mode = "articles_only"
-attentionvc_use_rising = true
-attentionvc_search_queries = ["anthropic", "openai", "solana"]
-attentionvc_search_limit_per_query = 3
+twscrape_db = "data/twscrape/accounts.db"
+twscrape_search_enabled = false
 
-attentionvc_article_min_views = 2000
-attentionvc_article_min_likes = 20
-attentionvc_article_min_replies = 5
+xhunt_groups = ["cn", "global"]
+xhunt_hours = 24
+xhunt_limit = 15
+xhunt_min_views = 1000
+xhunt_min_likes = 10
 
 attentionvc_tweet_min_views = 500
 attentionvc_tweet_min_likes = 10
-attentionvc_tweet_min_replies = 3
 
 attentionvc_reply_sample_limit = 100
 attentionvc_top_signal_count = 10
+```
 
-attentionvc_signal_min_views = 0
-attentionvc_signal_min_likes = 0
-attentionvc_signal_min_replies = 0
+If you want the paid path instead, also set:
+
+```toml
+attentionvc_api_key = "avc_..."
+attentionvc_base_url = "https://api.attentionvc.ai"
 ```
 
 ### Important Config Notes

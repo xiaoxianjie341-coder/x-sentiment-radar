@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from twitter_ops_agent.discovery.attentionvc import AttentionTweet
-from twitter_ops_agent.research.crowd_context import CrowdContextService, heuristic_crowd_summary
+from twitter_ops_agent.research.crowd_context import CrowdContextService, classify_signal_emotion, heuristic_crowd_summary
 
 
 def _tweet(tweet_id: str, *, text: str, likes: int = 0, replies: int = 0, views: int = 0) -> AttentionTweet:
@@ -152,3 +152,12 @@ def test_crowd_context_service_keeps_extra_candidates_for_downstream_filtering()
     summary = service.build(tweet_id="seed", seed_text="Seed topic text.")
 
     assert len(summary.top_signals) == 12
+
+
+def test_classify_signal_emotion_detects_crypto_bearish_fud_language():
+    text = (
+        "同意以下6点：CVDD 有参考，但我个人觉得最大跌幅 30% 这个可能不一定，"
+        "可以临近 20% 左右开始分批买。底部区域 45000-55000，时间 2-3 个月，当前策略：等待 + 轻仓。"
+    )
+
+    assert classify_signal_emotion(text) == "担忧/风险"

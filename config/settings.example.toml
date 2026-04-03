@@ -19,8 +19,21 @@ high_signal_source_handles = [
 # Preferred capture is twscrape; fallback is x-tweet-fetcher + camofox.
 twscrape_db = "data/twscrape/accounts.db"
 twscrape_expected_login = "Trieu"
+twscrape_search_enabled = false
+twscrape_x_client_transaction_id = ""
 x_fetcher_script = "scripts/x-tweet-fetcher.py"
 x_fetcher_browser = "camofox"
+
+# Free discovery path: XHunt public hot-tweets page.
+xhunt_base_url = "https://trends.xhunt.ai"
+xhunt_groups = ["cn", "global"]
+xhunt_hours = 24
+xhunt_limit = 15
+xhunt_min_views = 1000
+xhunt_min_likes = 10
+x_session_cookie_header = ""
+x_session_x_client_transaction_id = ""
+x_session_user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
 
 # Local persistence.
 sqlite_db = "data/twitter_ops_agent.sqlite3"
