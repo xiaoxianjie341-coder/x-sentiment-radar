@@ -1,16 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import html as html_lib
 import json
 import re
 from typing import Any, Callable, Iterable, Mapping
 from urllib import error, request
 
 
-BREAKING_URL = "https://polymarket.com/predictions/breaking-news"
+BREAKING_URL = "https://polymarket.com/zh/breaking"
 BASE_URL = "https://polymarket.com"
 
-_NEXT_DATA_RE = re.compile(r'<script id="__NEXT_DATA__"[^>]*>(?P<payload>.*?)</script>', re.S)
+_ZH_BREAKING_CARD_RE = re.compile(
+    r'<a class="group cursor-pointer" href="(?P<href>/zh/event/[^"]+)".*?'
+    r'group-hover:underline">(?P<title>.*?)</p>.*?'
+    r'<span>(?P<prob>\d+)%</span>.*?'
+    r'text-(?P<dir>red|green)[^"]*"><span>(?P<delta>\d+)%</span>',
+    re.S,
+)
 _EXCLUDED_CATEGORY_SLUGS = {
     "sports",
     "esports",
@@ -36,6 +43,9 @@ class PolymarketCandidate:
     volume_24h: float = 0.0
     liquidity: float = 0.0
     source_label: str = "breaking"
+    current_probability: float = 0.0
+    probability_change_24h: float = 0.0
+    change_direction: str = ""
 
 
 class PolymarketSignalScout:
@@ -69,8 +79,14 @@ class PolymarketSignalScout:
 
 def parse_breaking_candidates(html: str, *, filter_candidates: bool = True) -> list[PolymarketCandidate]:
     payload = _extract_next_data(html)
-    matches = _find_candidate_dicts(payload)
-    candidates = [_candidate_from_mapping(item, source_label="breaking") for item in matches]
+    biggest_movers = _extract_zh_breaking_biggest_movers(payload)
+    if biggest_movers:
+        candidates = biggest_movers
+    elif "/zh/event/" in html:
+        candidates = _parse_zh_breaking_cards(html)
+    else:
+        matches = _find_candidate_dicts(payload)
+        candidates = [_candidate_from_mapping(item, source_label="breaking") for item in matches]
     deduped = _dedupe_candidates(candidates)
     if filter_candidates:
         return [candidate for candidate in deduped if is_relevant_candidate(candidate)]
@@ -103,14 +119,108 @@ def _candidate_from_mapping(item: Mapping[str, object], *, source_label: str) ->
         volume_24h=float(item.get("volume24hr", item.get("volume_24h", item.get("volume", 0))) or 0),
         liquidity=float(item.get("liquidity", 0) or 0),
         source_label=source_label,
+        current_probability=float(item.get("current_probability", 0) or 0),
+        probability_change_24h=float(item.get("probability_change_24h", 0) or 0),
+        change_direction=str(item.get("change_direction", "")).strip(),
     )
 
 
+def _parse_zh_breaking_cards(html: str) -> list[PolymarketCandidate]:
+    candidates: list[PolymarketCandidate] = []
+    for index, match in enumerate(_ZH_BREAKING_CARD_RE.finditer(html), start=1):
+        href = html_lib.unescape(match.group("href"))
+        slug = href.strip("/").split("/event/", 1)[-1]
+        title = html_lib.unescape(match.group("title")).strip()
+        prob = float(match.group("prob"))
+        delta = float(match.group("delta"))
+        direction = "down" if match.group("dir") == "red" else "up"
+        candidates.append(
+            PolymarketCandidate(
+                market_id=f"zh-breaking:{index}",
+                title=title,
+                slug=slug,
+                market_url=f"{BASE_URL}{href}",
+                category_label="全部",
+                category_slug="all",
+                source_label="breaking",
+                current_probability=prob,
+                probability_change_24h=delta,
+                change_direction=direction,
+            )
+        )
+    return candidates
+
+
+def _extract_zh_breaking_biggest_movers(payload: object) -> list[PolymarketCandidate]:
+    if not isinstance(payload, dict):
+        return []
+    queries = (
+        payload.get("props", {})
+        .get("pageProps", {})
+        .get("dehydratedState", {})
+        .get("queries", [])
+    )
+    if not isinstance(queries, list):
+        return []
+    for entry in queries:
+        if not isinstance(entry, dict):
+            continue
+        query_hash = str(entry.get("queryHash", ""))
+        query_key = entry.get("queryKey", [])
+        if '["biggest-movers","all"]' != query_hash and not (
+            isinstance(query_key, list) and len(query_key) >= 2 and query_key[0] == "biggest-movers" and query_key[1] == "all"
+        ):
+            continue
+        data = entry.get("state", {}).get("data", {})
+        if not isinstance(data, dict):
+            continue
+        markets = data.get("markets", [])
+        if not isinstance(markets, list):
+            continue
+        candidates: list[PolymarketCandidate] = []
+        for index, item in enumerate(markets, start=1):
+            if not isinstance(item, dict):
+                continue
+            slug = str(item.get("slug", "")).strip()
+            if not slug:
+                continue
+            change = float(item.get("livePriceChange", 0) or 0)
+            events = item.get("events", [])
+            event_slug = ""
+            if isinstance(events, list) and events and isinstance(events[0], dict):
+                event_slug = str(events[0].get("slug", "")).strip()
+            event_prefix = f"/zh/event/{event_slug}/" if event_slug else "/zh/event/"
+            candidates.append(
+                PolymarketCandidate(
+                    market_id=str(item.get("id", slug)).strip(),
+                    title=str(item.get("question", item.get("title", ""))).strip(),
+                    slug=slug,
+                    market_url=f"{BASE_URL}{event_prefix}{slug}",
+                    category_label="全部",
+                    category_slug="all",
+                    source_label="breaking",
+                    current_probability=float(item.get("currentPrice", 0) or 0) * 100,
+                    probability_change_24h=abs(change),
+                    change_direction="down" if change < 0 else "up",
+                )
+            )
+        return candidates
+    return []
+
+
 def _extract_next_data(html: str) -> object:
-    match = _NEXT_DATA_RE.search(html)
-    if not match:
+    marker = '<script id="__NEXT_DATA__"'
+    start = html.find(marker)
+    if start == -1:
         return {}
-    return json.loads(match.group("payload"))
+    start = html.find(">", start)
+    if start == -1:
+        return {}
+    start += 1
+    end = html.find("</script>", start)
+    if end == -1:
+        return {}
+    return json.loads(html[start:end])
 
 
 def _find_candidate_dicts(payload: object) -> list[Mapping[str, object]]:

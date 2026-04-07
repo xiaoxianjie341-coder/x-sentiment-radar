@@ -35,13 +35,21 @@ function renderBreakingFeed(data) {
   const candidates = Array.isArray(data.candidates) ? data.candidates : [];
   const newCandidateSet = new Set((data.new_candidates || []).map((item) => item.slug));
   const reviewMap = new Map((data.reviewed_candidates || []).map((item) => [item.slug, item]));
+  const orderedCandidates = [...candidates].sort((left, right) => {
+    const leftReview = reviewMap.get(left.slug);
+    const rightReview = reviewMap.get(right.slug);
+    const leftRank = leftReview ? (leftReview.is_viral ? 0 : 1) : 2;
+    const rightRank = rightReview ? (rightReview.is_viral ? 0 : 1) : 2;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return 0;
+  });
 
-  if (!candidates.length) {
+  if (!orderedCandidates.length) {
     breakingFeedEl.innerHTML = emptyState("当前没有抓到 Breaking 事件。");
     return;
   }
 
-  breakingFeedEl.innerHTML = candidates
+  breakingFeedEl.innerHTML = orderedCandidates
     .map((item, index) => {
       const isNew = newCandidateSet.has(item.slug);
       const review = reviewMap.get(item.slug);
