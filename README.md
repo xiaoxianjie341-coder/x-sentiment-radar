@@ -225,6 +225,14 @@ data/cross-signal/latest.json
 
 这个脚本适合“先看有没有过两道关卡的 topic”，然后再决定要不要继续做深度研究。
 
+如果你想无视 seen state，强制让当前整页 Breaking 事件都过一遍 Grok，可以跑：
+
+```bash
+./scripts/review-all-breaking-now.sh
+```
+
+这个命令适合人工复盘或想看“每个候选为什么没过”的时候。
+
 如果你想按“每 30 分钟巡检一次，只处理新进入 Breaking 的事件”来跑，推荐顺序是：
 
 ```bash

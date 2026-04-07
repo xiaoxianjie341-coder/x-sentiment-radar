@@ -337,6 +337,22 @@ body::before {
   line-height: 1.6;
 }
 
+.topic-card.is-rejected {
+  border-color: rgba(255, 212, 121, 0.18);
+}
+
+.topic-card.is-rejected::before {
+  background: linear-gradient(90deg, transparent, rgba(255, 212, 121, 0.55), transparent);
+}
+
+.topic-card.is-passed {
+  border-color: rgba(102, 242, 198, 0.2);
+}
+
+.topic-card.is-passed::before {
+  background: linear-gradient(90deg, transparent, rgba(102, 242, 198, 0.55), transparent);
+}
+
 .topic-posts {
   display: grid;
   gap: 10px;

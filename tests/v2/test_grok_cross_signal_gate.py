@@ -151,3 +151,44 @@ def test_grok_cross_signal_gate_accepts_non_numeric_confidence(monkeypatch):
 
     assert alert is not None
     assert alert.angle_summary == "Angle"
+
+
+def test_grok_cross_signal_gate_review_keeps_failed_reason_and_posts(monkeypatch):
+    def stub_urlopen(req, timeout):  # noqa: ANN001, ARG001
+        return StubResponse(
+            {
+                "output_text": json.dumps(
+                    {
+                        "is_viral": False,
+                        "reason_if_not_viral": "discussion is fragmented and still too thin",
+                        "top_5_posts": [
+                            {
+                                "text": "Some people are talking about the KitKat heist.",
+                                "url": "https://x.com/example/status/1",
+                                "author_handle": "example",
+                                "retweet_velocity": "low",
+                                "secondary_engagement_desc": "little quote activity",
+                            }
+                        ],
+                        "one_line_angle": "It exists, but it is not consolidating yet.",
+                        "confidence": 41,
+                    }
+                )
+            }
+        )
+
+    monkeypatch.setattr("twitter_ops_agent.v2.agents.grok_cross_signal_gate.request.urlopen", stub_urlopen)
+    gate = GrokCrossSignalGate(
+        config=XaiSearchConfig(
+            api_key="secret",
+            model="grok-4-1-fast-reasoning",
+        )
+    )
+
+    review = gate.review(_candidate(), queries=("kitkat heist",))
+
+    assert review.is_viral is False
+    assert review.reason_if_not_viral == "discussion is fragmented and still too thin"
+    assert review.angle_summary == "It exists, but it is not consolidating yet."
+    assert review.distinct_post_count == 1
+    assert [post.author_handle for post in review.top_posts] == ["example"]

@@ -203,6 +203,22 @@ class CrossSignalCandidate:
 
 
 @dataclass(slots=True)
+class CrossSignalReview:
+    slug: str
+    market_title: str
+    market_url: str
+    source_label: str
+    queries: tuple[str, ...] = ()
+    is_viral: bool = False
+    reason_if_not_viral: str = ""
+    angle_summary: str = ""
+    confidence: int = 0
+    top_posts: tuple["CrossSignalPost", ...] = ()
+    distinct_post_count: int = 0
+    distinct_account_count: int = 0
+
+
+@dataclass(slots=True)
 class CrossSignalAlert:
     topic: str
     market_title: str

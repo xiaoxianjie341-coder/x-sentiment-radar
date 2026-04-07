@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
-from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalCandidate
+from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalCandidate, CrossSignalReview
 
 
 @dataclass(slots=True)
@@ -14,6 +14,7 @@ class CrossSignalRunReport:
     passed_count: int
     candidates: tuple[CrossSignalCandidate, ...] = ()
     new_candidates: tuple[CrossSignalCandidate, ...] = ()
+    reviewed_candidates: tuple[CrossSignalReview, ...] = ()
     topics: tuple[CrossSignalAlert, ...] = ()
 
 
@@ -45,16 +46,31 @@ class CrossSignalOrchestrator:
     gate: object
     state_store: object | None = None
 
-    def run(self) -> CrossSignalRunReport:
+    def run(self, *, review_all: bool = False) -> CrossSignalRunReport:
         candidates = list(self.scout.run())
         seen = self.state_store.load_seen() if self.state_store is not None else ()
         seen_set = set(seen)
-        new_candidates = [candidate for candidate in candidates if getattr(candidate, "slug", "") not in seen_set]
+        new_candidates = (
+            list(candidates)
+            if review_all
+            else [candidate for candidate in candidates if getattr(candidate, "slug", "") not in seen_set]
+        )
+        reviews = tuple(_review_candidate(self.gate, candidate) for candidate in new_candidates)
         topics = tuple(
-            alert
-            for candidate in new_candidates
-            for alert in [self.gate.evaluate(candidate)]
-            if alert is not None
+            CrossSignalAlert(
+                topic=review.slug or review.market_title,
+                market_title=review.market_title,
+                market_url=review.market_url,
+                source_label=review.source_label,
+                queries=review.queries,
+                top_posts=review.top_posts,
+                angle_summary=review.angle_summary,
+                distinct_post_count=review.distinct_post_count,
+                distinct_account_count=review.distinct_account_count,
+                verification_passed=True,
+            )
+            for review in reviews
+            if review.is_viral
         )
         all_candidate_previews = tuple(_to_candidate_preview(candidate) for candidate in candidates)
         new_candidate_previews = tuple(_to_candidate_preview(candidate) for candidate in new_candidates)
@@ -70,6 +86,7 @@ class CrossSignalOrchestrator:
             passed_count=len(topics),
             candidates=all_candidate_previews,
             new_candidates=new_candidate_previews,
+            reviewed_candidates=reviews,
             topics=topics,
         )
 
@@ -96,4 +113,34 @@ def _to_candidate_preview(candidate: object) -> CrossSignalCandidate:
         secondary_category_slug=str(getattr(candidate, "secondary_category_slug", "")).strip(),
         volume_24h=float(getattr(candidate, "volume_24h", 0.0) or 0.0),
         liquidity=float(getattr(candidate, "liquidity", 0.0) or 0.0),
+    )
+
+
+def _review_candidate(gate: object, candidate: object) -> CrossSignalReview:
+    if hasattr(gate, "review"):
+        return gate.review(candidate)
+
+    alert = gate.evaluate(candidate)
+    if alert is None:
+        return CrossSignalReview(
+            slug=str(getattr(candidate, "slug", "")).strip(),
+            market_title=str(getattr(candidate, "title", "")).strip(),
+            market_url=str(getattr(candidate, "market_url", "")).strip(),
+            source_label=str(getattr(candidate, "source_label", "")).strip(),
+            is_viral=False,
+            reason_if_not_viral="Gate returned no passing alert.",
+        )
+
+    return CrossSignalReview(
+        slug=str(getattr(candidate, "slug", "")).strip(),
+        market_title=alert.market_title,
+        market_url=alert.market_url,
+        source_label=alert.source_label,
+        queries=alert.queries,
+        is_viral=True,
+        angle_summary=alert.angle_summary,
+        confidence=0,
+        top_posts=alert.top_posts,
+        distinct_post_count=alert.distinct_post_count,
+        distinct_account_count=alert.distinct_account_count,
     )

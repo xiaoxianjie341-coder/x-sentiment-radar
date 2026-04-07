@@ -13,7 +13,7 @@ from twitter_ops_agent.discovery.attentionvc import AttentionVCArticleClient
 from twitter_ops_agent.discovery.polymarket import PolymarketSignalScout
 from twitter_ops_agent.discovery.xhunt import XHuntScoutAgent, XHuntTrendClient
 from twitter_ops_agent.doctor import run_doctor
-from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalCandidate, CrossSignalPost
+from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalCandidate, CrossSignalPost, CrossSignalReview
 from twitter_ops_agent.events.linker import EventService
 from twitter_ops_agent.research.browser_x_client import BrowserXSessionCrowdClient
 from twitter_ops_agent.research.crowd_context import CrowdContextService, LLMCrowdSummarizer
@@ -43,6 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
     subcommands.add_parser("run-v2", help="Run the sentiment-first workflow.")
     cross_signal_parser = subcommands.add_parser("cross-signal", help="Run the Polymarket + X cross-signal monitor.")
     cross_signal_parser.add_argument("--save-to", type=Path, default=None, help="Optional path to save the JSON report.")
+    cross_signal_parser.add_argument("--review-all", action="store_true", help="Ignore seen state and review the full current Breaking page.")
     return parser
 
 
@@ -92,7 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "cross-signal":
         try:
-            report = build_cross_signal_orchestrator(settings).run()
+            report = build_cross_signal_orchestrator(settings).run(review_all=args.review_all)
         except Exception as exc:  # noqa: BLE001
             print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
             return 1
@@ -103,6 +104,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "passed_count": report.passed_count,
                 "candidates": [_serialize_cross_signal_candidate(item) for item in report.candidates],
                 "new_candidates": [_serialize_cross_signal_candidate(item) for item in report.new_candidates],
+                "reviewed_candidates": [_serialize_cross_signal_review(item) for item in report.reviewed_candidates],
                 "topics": [_serialize_cross_signal_alert(item) for item in report.topics],
             },
             ensure_ascii=False,
@@ -341,6 +343,23 @@ def _serialize_cross_signal_candidate(candidate: CrossSignalCandidate) -> dict[s
         "secondary_category_slug": candidate.secondary_category_slug,
         "volume_24h": candidate.volume_24h,
         "liquidity": candidate.liquidity,
+    }
+
+
+def _serialize_cross_signal_review(review: CrossSignalReview) -> dict[str, object]:
+    return {
+        "slug": review.slug,
+        "market_title": review.market_title,
+        "market_url": review.market_url,
+        "source_label": review.source_label,
+        "queries": list(review.queries),
+        "is_viral": review.is_viral,
+        "reason_if_not_viral": review.reason_if_not_viral,
+        "angle_summary": review.angle_summary,
+        "confidence": review.confidence,
+        "distinct_post_count": review.distinct_post_count,
+        "distinct_account_count": review.distinct_account_count,
+        "top_posts": [_serialize_cross_signal_post(post) for post in review.top_posts],
     }
 
 

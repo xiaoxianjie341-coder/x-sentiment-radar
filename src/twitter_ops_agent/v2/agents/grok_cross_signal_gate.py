@@ -5,7 +5,7 @@ import json
 from urllib import error, request
 
 from twitter_ops_agent.discovery.polymarket import PolymarketCandidate
-from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalPost
+from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalPost, CrossSignalReview
 from twitter_ops_agent.v2.agents.cross_signal_gate import build_topic_queries
 from twitter_ops_agent.writer.llm_writer import build_endpoint, extract_text_from_response
 
@@ -23,12 +23,12 @@ class XaiSearchConfig:
 class GrokCrossSignalGate:
     config: XaiSearchConfig
 
-    def evaluate(
+    def review(
         self,
         candidate: PolymarketCandidate,
         *,
         queries: tuple[str, ...] | None = None,
-    ) -> CrossSignalAlert | None:
+    ) -> CrossSignalReview:
         resolved_queries = queries or build_topic_queries(candidate)
         payload = _call_xai(
             config=self.config,
@@ -41,9 +41,6 @@ class GrokCrossSignalGate:
             },
         )
         parsed = _parse_gate_output(payload)
-        if not parsed["is_viral"]:
-            return None
-
         posts = tuple(
             CrossSignalPost(
                 tweet_id=f"grok:{index}",
@@ -56,16 +53,40 @@ class GrokCrossSignalGate:
             if str(item.get("text", "")).strip() or str(item.get("url", "")).strip()
         )
         distinct_accounts = len({post.author_handle.lower() for post in posts if post.author_handle})
-        return CrossSignalAlert(
-            topic=resolved_queries[0] if resolved_queries else candidate.title,
+        return CrossSignalReview(
+            slug=candidate.slug,
             market_title=candidate.title,
             market_url=candidate.market_url,
             source_label=candidate.source_label,
             queries=tuple(resolved_queries),
-            top_posts=posts,
+            is_viral=bool(parsed["is_viral"]),
+            reason_if_not_viral=str(parsed["reason_if_not_viral"]).strip(),
             angle_summary=str(parsed["one_line_angle"]).strip(),
+            confidence=int(parsed["confidence"]),
+            top_posts=posts,
             distinct_post_count=len(posts),
             distinct_account_count=distinct_accounts,
+        )
+
+    def evaluate(
+        self,
+        candidate: PolymarketCandidate,
+        *,
+        queries: tuple[str, ...] | None = None,
+    ) -> CrossSignalAlert | None:
+        review = self.review(candidate, queries=queries)
+        if not review.is_viral:
+            return None
+        return CrossSignalAlert(
+            topic=review.queries[0] if review.queries else candidate.title,
+            market_title=review.market_title,
+            market_url=review.market_url,
+            source_label=review.source_label,
+            queries=review.queries,
+            top_posts=review.top_posts,
+            angle_summary=review.angle_summary,
+            distinct_post_count=review.distinct_post_count,
+            distinct_account_count=review.distinct_account_count,
             verification_passed=True,
         )
 

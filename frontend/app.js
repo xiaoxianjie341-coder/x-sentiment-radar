@@ -5,6 +5,7 @@ const newCandidateCountEl = document.querySelector("#new-candidate-count");
 const passedCountEl = document.querySelector("#passed-count");
 const breakingFeedEl = document.querySelector("#breaking-feed");
 const newCandidatesEl = document.querySelector("#new-candidates");
+const reviewedCandidatesEl = document.querySelector("#reviewed-candidates");
 const passedTopicsEl = document.querySelector("#passed-topics");
 const rawPreviewEl = document.querySelector("#raw-preview");
 
@@ -21,6 +22,7 @@ async function init() {
   renderMetrics(data);
   renderBreakingFeed(data);
   renderNewCandidates(data);
+  renderReviewedCandidates(data);
   renderPassedTopics(data);
   rawPreviewEl.textContent = JSON.stringify(data, null, 2);
 }
@@ -122,6 +124,57 @@ function renderPassedTopics(data) {
                 `
               )
               .join("")}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderReviewedCandidates(data) {
+  const reviews = Array.isArray(data.reviewed_candidates) ? data.reviewed_candidates : [];
+
+  if (!reviews.length) {
+    reviewedCandidatesEl.innerHTML = emptyState("这一轮还没有完成任何 Grok review。");
+    return;
+  }
+
+  reviewedCandidatesEl.innerHTML = reviews
+    .map((review) => {
+      const posts = Array.isArray(review.top_posts) ? review.top_posts : [];
+      const cardClass = review.is_viral ? "topic-card is-passed" : "topic-card is-rejected";
+      return `
+        <article class="${cardClass}">
+          <h3>${escapeHtml(review.market_title)}</h3>
+          <p>${escapeHtml(review.angle_summary || review.reason_if_not_viral || "Grok 没有给出稳定角度。")}</p>
+          <div class="topic-stats">
+            ${statBox("Confidence", review.confidence ?? 0)}
+            ${statBox("Posts Seen", review.distinct_post_count ?? 0)}
+          </div>
+          <div class="topic-meta">
+            ${tagChip(review.is_viral ? "passed" : "rejected")}
+            ${(review.queries || []).map((query) => tagChip(query)).join("")}
+          </div>
+          ${
+            review.reason_if_not_viral
+              ? `<p>${escapeHtml(`未通过原因：${review.reason_if_not_viral}`)}</p>`
+              : ""
+          }
+          <div class="topic-posts">
+            ${
+              posts.length
+                ? posts
+                    .map(
+                      (post) => `
+                        <article class="topic-post">
+                          <a href="${escapeHtml(post.url)}" target="_blank" rel="noreferrer">${escapeHtml(post.author_handle || post.url)}</a>
+                          <p>${escapeHtml(post.text || "")}</p>
+                        </article>
+                      `
+                    )
+                    .join("")
+                : `<div class="empty-state">这条 review 没带可展示帖子。</div>`
+            }
           </div>
         </article>
       `;

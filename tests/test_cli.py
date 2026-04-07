@@ -19,10 +19,11 @@ def test_cli_parser_accepts_cross_signal():
 def test_cli_parser_accepts_cross_signal_save_to(tmp_path: Path):
     parser = build_parser()
     out_path = tmp_path / "latest.json"
-    args = parser.parse_args(["cross-signal", "--save-to", str(out_path)])
+    args = parser.parse_args(["cross-signal", "--save-to", str(out_path), "--review-all"])
 
     assert args.command == "cross-signal"
     assert args.save_to == out_path
+    assert args.review_all is True
 
 
 def test_build_v2_runtime_falls_back_to_xhunt_and_twscrape_when_attentionvc_is_missing(monkeypatch, tmp_path: Path):
@@ -162,9 +163,10 @@ def test_main_cross_signal_prints_new_candidate_count(monkeypatch, capsys):
         topics = ()
         candidates = ()
         new_candidates = ()
+        reviewed_candidates = ()
 
     class StubOrchestrator:
-        def run(self):
+        def run(self, review_all=False):
             return StubReport()
 
     monkeypatch.setattr("twitter_ops_agent.cli.build_cross_signal_orchestrator", lambda settings: StubOrchestrator())
@@ -187,9 +189,10 @@ def test_main_cross_signal_prints_json_report(monkeypatch, capsys):
         topics = ()
         candidates = ()
         new_candidates = ()
+        reviewed_candidates = ()
 
     class StubOrchestrator:
-        def run(self):
+        def run(self, review_all=False):
             return StubReport()
 
     monkeypatch.setattr("twitter_ops_agent.cli.build_cross_signal_orchestrator", lambda settings: StubOrchestrator())
@@ -213,9 +216,10 @@ def test_main_cross_signal_can_save_json_report(monkeypatch, capsys, tmp_path: P
         topics = ()
         candidates = ()
         new_candidates = ()
+        reviewed_candidates = ()
 
     class StubOrchestrator:
-        def run(self):
+        def run(self, review_all=False):
             return StubReport()
 
     monkeypatch.setattr("twitter_ops_agent.cli.build_cross_signal_orchestrator", lambda settings: StubOrchestrator())
