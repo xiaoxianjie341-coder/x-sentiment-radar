@@ -145,6 +145,7 @@ twitter-ops-agent doctor --json
 
 - `doctor`：检查当前解析到的 `obsidian_root` 和 `sqlite_db`
 - `run-v2`：执行完整的主题发现和写入流程
+- `cross-signal`：执行 `Polymarket -> X` 的两道关卡交叉验证，输出 green-light topic JSON
 - 支持 `AttentionVC` 或 `XHunt + twscrape` 做主题发现和原帖补全
 - 支持 `article / tweet / related discussion` 多来源补充
 - 每个主题最多抓 `100` 条回复样本
@@ -191,6 +192,24 @@ twitter-ops-agent run-v2
 ```bash
 ./scripts/run-xhunt-free.sh
 ```
+
+如果你想先做“社会热点交叉印证”，再决定要不要进入情绪分析流程，可以先跑：
+
+```bash
+twitter-ops-agent cross-signal
+```
+
+它的逻辑不是交易信号，而是两道关卡：
+
+- 第一关：`Polymarket` 候选信号，优先看 `Breaking` 这类更像公共议题的候选
+- 第二关：`X` 扩散验证，确认这个 topic 已经形成多帖讨论，而不是只有一条爆帖
+
+只有两关都通过，系统才会输出一条 green-light 结果，里面会带：
+
+- topic
+- Polymarket 来源
+- X 上传播势能最强的前 5 条帖子
+- 当前正在跑出来的一句角度总结
 
 ### 第一次配置
 

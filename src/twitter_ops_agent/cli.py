@@ -10,18 +10,22 @@ from zoneinfo import ZoneInfo
 
 from twitter_ops_agent.config import load_settings, resolve_config_path
 from twitter_ops_agent.discovery.attentionvc import AttentionVCArticleClient
+from twitter_ops_agent.discovery.polymarket import PolymarketSignalScout
 from twitter_ops_agent.discovery.xhunt import XHuntScoutAgent, XHuntTrendClient
 from twitter_ops_agent.doctor import run_doctor
+from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalPost
 from twitter_ops_agent.events.linker import EventService
 from twitter_ops_agent.research.browser_x_client import BrowserXSessionCrowdClient
 from twitter_ops_agent.research.crowd_context import CrowdContextService, LLMCrowdSummarizer
 from twitter_ops_agent.research.twscrape_client import TwscrapeCrowdClient
 from twitter_ops_agent.storage.repository import SqliteRepository
+from twitter_ops_agent.v2.agents.cross_signal_gate import CrossSignalGate
 from twitter_ops_agent.v2.agents.angle_synthesizer import AngleSynthesizerAgent
 from twitter_ops_agent.v2.agents.crowd_sense import CrowdSenseAgent
 from twitter_ops_agent.v2.agents.hydration_agent import HydrationAgent
 from twitter_ops_agent.v2.agents.priority_gate import PriorityGateAgent
 from twitter_ops_agent.v2.agents.topic_scout import TopicScoutAgent
+from twitter_ops_agent.v2.cross_signal import CrossSignalOrchestrator
 from twitter_ops_agent.v2.orchestrator import V2Orchestrator
 from twitter_ops_agent.v2.output.publisher import TopicWorkspacePublisher
 from twitter_ops_agent.writer.llm_writer import LLMWriterConfig
@@ -36,6 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--json", action="store_true", help="Emit the doctor report as JSON.")
 
     subcommands.add_parser("run-v2", help="Run the sentiment-first workflow.")
+    subcommands.add_parser("cross-signal", help="Run the Polymarket + X cross-signal monitor.")
     return parser
 
 
@@ -76,6 +81,25 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "radar_written": report.radar_written,
                     "topic_notes_written": report.topic_notes_written,
                     "viewpoint_notes_written": report.viewpoint_notes_written,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0
+
+    if args.command == "cross-signal":
+        try:
+            report = build_cross_signal_orchestrator(settings).run()
+        except Exception as exc:  # noqa: BLE001
+            print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
+            return 1
+        print(
+            json.dumps(
+                {
+                    "candidate_count": report.candidate_count,
+                    "passed_count": report.passed_count,
+                    "topics": [_serialize_cross_signal_alert(item) for item in report.topics],
                 },
                 ensure_ascii=False,
                 indent=2,
@@ -237,6 +261,61 @@ def build_browser_x_session_client(settings):
         x_client_transaction_id=settings.x_session_x_client_transaction_id,
         user_agent=settings.x_session_user_agent,
     )
+
+
+def build_cross_signal_runtime(settings):
+    return {
+        "scout": PolymarketSignalScout(),
+        "gate": CrossSignalGate(
+            client=TwscrapeCrowdClient.from_db(
+                settings.twscrape_db,
+                search_enabled=True,
+                x_client_transaction_id=settings.twscrape_x_client_transaction_id,
+            ),
+            min_posts=settings.cross_signal_min_posts,
+            min_accounts=settings.cross_signal_min_accounts,
+            search_limit=settings.cross_signal_search_limit,
+            top_post_limit=settings.cross_signal_top_post_limit,
+        ),
+    }
+
+
+def build_cross_signal_orchestrator(settings):
+    runtime = build_cross_signal_runtime(settings)
+    return CrossSignalOrchestrator(
+        scout=runtime["scout"],
+        gate=runtime["gate"],
+    )
+
+
+def _serialize_cross_signal_alert(alert: CrossSignalAlert) -> dict[str, object]:
+    return {
+        "topic": alert.topic,
+        "market_title": alert.market_title,
+        "market_url": alert.market_url,
+        "source_label": alert.source_label,
+        "queries": list(alert.queries),
+        "angle_summary": alert.angle_summary,
+        "distinct_post_count": alert.distinct_post_count,
+        "distinct_account_count": alert.distinct_account_count,
+        "verification_passed": alert.verification_passed,
+        "top_posts": [_serialize_cross_signal_post(post) for post in alert.top_posts],
+    }
+
+
+def _serialize_cross_signal_post(post: CrossSignalPost) -> dict[str, object]:
+    return {
+        "tweet_id": post.tweet_id,
+        "author_handle": post.author_handle,
+        "text": post.text,
+        "url": post.url,
+        "likes": post.likes,
+        "retweets": post.retweets,
+        "replies": post.replies,
+        "quotes": post.quotes,
+        "views": post.views,
+        "spread_score": post.spread_score,
+    }
 
 
 def _local_day_key(settings) -> str:

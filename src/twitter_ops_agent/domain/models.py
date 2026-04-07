@@ -177,6 +177,34 @@ class CrowdSignal:
 
 
 @dataclass(slots=True)
+class CrossSignalPost:
+    tweet_id: str
+    author_handle: str
+    text: str
+    url: str
+    likes: int = 0
+    retweets: int = 0
+    replies: int = 0
+    quotes: int = 0
+    views: int = 0
+    spread_score: float = 0.0
+
+
+@dataclass(slots=True)
+class CrossSignalAlert:
+    topic: str
+    market_title: str
+    market_url: str
+    source_label: str
+    queries: tuple[str, ...] = ()
+    top_posts: tuple[CrossSignalPost, ...] = ()
+    angle_summary: str = ""
+    distinct_post_count: int = 0
+    distinct_account_count: int = 0
+    verification_passed: bool = False
+
+
+@dataclass(slots=True)
 class CrowdSummary:
     sentiment_summary: str
     key_points: tuple[str, ...] = ()

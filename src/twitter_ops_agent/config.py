@@ -76,6 +76,10 @@ class AppSettings:
     attentionvc_signal_min_views: int
     attentionvc_signal_min_likes: int
     attentionvc_signal_min_replies: int
+    cross_signal_min_posts: int
+    cross_signal_min_accounts: int
+    cross_signal_search_limit: int
+    cross_signal_top_post_limit: int
 
 
 def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None = None) -> AppSettings:
@@ -136,6 +140,10 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "attentionvc_signal_min_views": 0,
         "attentionvc_signal_min_likes": 0,
         "attentionvc_signal_min_replies": 0,
+        "cross_signal_min_posts": 3,
+        "cross_signal_min_accounts": 2,
+        "cross_signal_search_limit": 20,
+        "cross_signal_top_post_limit": 5,
     }
 
     config_values: dict[str, Any] = {}
@@ -209,6 +217,10 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         attentionvc_signal_min_views=int(values["attentionvc_signal_min_views"]),
         attentionvc_signal_min_likes=int(values["attentionvc_signal_min_likes"]),
         attentionvc_signal_min_replies=int(values["attentionvc_signal_min_replies"]),
+        cross_signal_min_posts=int(values["cross_signal_min_posts"]),
+        cross_signal_min_accounts=int(values["cross_signal_min_accounts"]),
+        cross_signal_search_limit=int(values["cross_signal_search_limit"]),
+        cross_signal_top_post_limit=int(values["cross_signal_top_post_limit"]),
     )
 
 
@@ -273,6 +285,10 @@ def _load_env_overrides(env: Mapping[str, str], base_dir: Path) -> dict[str, Any
             "attentionvc_signal_min_views",
             "attentionvc_signal_min_likes",
             "attentionvc_signal_min_replies",
+            "cross_signal_min_posts",
+            "cross_signal_min_accounts",
+            "cross_signal_search_limit",
+            "cross_signal_top_post_limit",
         }:
             overrides[field_name] = int(value)
         elif field_name in {"attentionvc_use_rising", "twscrape_search_enabled"}:
