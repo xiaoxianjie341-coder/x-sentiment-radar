@@ -160,6 +160,8 @@ def test_main_cross_signal_prints_new_candidate_count(monkeypatch, capsys):
         new_candidate_count = 2
         passed_count = 1
         topics = ()
+        candidates = ()
+        new_candidates = ()
 
     class StubOrchestrator:
         def run(self):
@@ -183,6 +185,8 @@ def test_main_cross_signal_prints_json_report(monkeypatch, capsys):
         new_candidate_count = 1
         passed_count = 1
         topics = ()
+        candidates = ()
+        new_candidates = ()
 
     class StubOrchestrator:
         def run(self):
@@ -207,6 +211,8 @@ def test_main_cross_signal_can_save_json_report(monkeypatch, capsys, tmp_path: P
         new_candidate_count = 1
         passed_count = 1
         topics = ()
+        candidates = ()
+        new_candidates = ()
 
     class StubOrchestrator:
         def run(self):

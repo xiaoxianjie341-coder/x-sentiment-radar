@@ -191,6 +191,18 @@ class CrossSignalPost:
 
 
 @dataclass(slots=True)
+class CrossSignalCandidate:
+    slug: str
+    title: str
+    market_url: str
+    source_label: str
+    category_slug: str = ""
+    secondary_category_slug: str = ""
+    volume_24h: float = 0.0
+    liquidity: float = 0.0
+
+
+@dataclass(slots=True)
 class CrossSignalAlert:
     topic: str
     market_title: str

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 
-from twitter_ops_agent.domain.models import CrossSignalAlert
+from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalCandidate
 
 
 @dataclass(slots=True)
@@ -12,6 +12,8 @@ class CrossSignalRunReport:
     candidate_count: int
     new_candidate_count: int
     passed_count: int
+    candidates: tuple[CrossSignalCandidate, ...] = ()
+    new_candidates: tuple[CrossSignalCandidate, ...] = ()
     topics: tuple[CrossSignalAlert, ...] = ()
 
 
@@ -54,6 +56,8 @@ class CrossSignalOrchestrator:
             for alert in [self.gate.evaluate(candidate)]
             if alert is not None
         )
+        all_candidate_previews = tuple(_to_candidate_preview(candidate) for candidate in candidates)
+        new_candidate_previews = tuple(_to_candidate_preview(candidate) for candidate in new_candidates)
         if self.state_store is not None:
             merged = _merge_seen(
                 [getattr(candidate, "slug", "") for candidate in candidates],
@@ -64,6 +68,8 @@ class CrossSignalOrchestrator:
             candidate_count=len(candidates),
             new_candidate_count=len(new_candidates),
             passed_count=len(topics),
+            candidates=all_candidate_previews,
+            new_candidates=new_candidate_previews,
             topics=topics,
         )
 
@@ -78,3 +84,16 @@ def _merge_seen(current_ids: list[str], previous_seen: tuple[str, ...]) -> tuple
         seen.add(normalized)
         merged.append(normalized)
     return tuple(merged)
+
+
+def _to_candidate_preview(candidate: object) -> CrossSignalCandidate:
+    return CrossSignalCandidate(
+        slug=str(getattr(candidate, "slug", "")).strip(),
+        title=str(getattr(candidate, "title", "")).strip(),
+        market_url=str(getattr(candidate, "market_url", "")).strip(),
+        source_label=str(getattr(candidate, "source_label", "")).strip(),
+        category_slug=str(getattr(candidate, "category_slug", "")).strip(),
+        secondary_category_slug=str(getattr(candidate, "secondary_category_slug", "")).strip(),
+        volume_24h=float(getattr(candidate, "volume_24h", 0.0) or 0.0),
+        liquidity=float(getattr(candidate, "liquidity", 0.0) or 0.0),
+    )

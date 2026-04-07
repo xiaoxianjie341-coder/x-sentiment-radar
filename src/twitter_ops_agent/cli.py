@@ -13,7 +13,7 @@ from twitter_ops_agent.discovery.attentionvc import AttentionVCArticleClient
 from twitter_ops_agent.discovery.polymarket import PolymarketSignalScout
 from twitter_ops_agent.discovery.xhunt import XHuntScoutAgent, XHuntTrendClient
 from twitter_ops_agent.doctor import run_doctor
-from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalPost
+from twitter_ops_agent.domain.models import CrossSignalAlert, CrossSignalCandidate, CrossSignalPost
 from twitter_ops_agent.events.linker import EventService
 from twitter_ops_agent.research.browser_x_client import BrowserXSessionCrowdClient
 from twitter_ops_agent.research.crowd_context import CrowdContextService, LLMCrowdSummarizer
@@ -101,6 +101,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "candidate_count": report.candidate_count,
                 "new_candidate_count": report.new_candidate_count,
                 "passed_count": report.passed_count,
+                "candidates": [_serialize_cross_signal_candidate(item) for item in report.candidates],
+                "new_candidates": [_serialize_cross_signal_candidate(item) for item in report.new_candidates],
                 "topics": [_serialize_cross_signal_alert(item) for item in report.topics],
             },
             ensure_ascii=False,
@@ -326,6 +328,19 @@ def _serialize_cross_signal_alert(alert: CrossSignalAlert) -> dict[str, object]:
         "distinct_account_count": alert.distinct_account_count,
         "verification_passed": alert.verification_passed,
         "top_posts": [_serialize_cross_signal_post(post) for post in alert.top_posts],
+    }
+
+
+def _serialize_cross_signal_candidate(candidate: CrossSignalCandidate) -> dict[str, object]:
+    return {
+        "slug": candidate.slug,
+        "title": candidate.title,
+        "market_url": candidate.market_url,
+        "source_label": candidate.source_label,
+        "category_slug": candidate.category_slug,
+        "secondary_category_slug": candidate.secondary_category_slug,
+        "volume_24h": candidate.volume_24h,
+        "liquidity": candidate.liquidity,
     }
 
 

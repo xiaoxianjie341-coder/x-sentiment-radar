@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poly X Signal Deck</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <div class="ambient ambient-left"></div>
+      <div class="ambient ambient-right"></div>
+
+      <header class="hero-panel panel">
+        <div class="hero-copy">
+          <p class="eyebrow">POLYMARKET BREAKING × GROK X SEARCH</p>
+          <h1>Cross-Signal Deck</h1>
+          <p class="hero-text">
+            先看 Polymarket Breaking 的整页事件，再让 Grok 判断 X 上有没有形成真实讨论。
+            这是一个热点交叉印证台，不是普通后台。
+          </p>
+        </div>
+        <div class="hero-stats">
+          <div class="metric-card">
+            <span class="metric-label">Breaking Events</span>
+            <strong id="candidate-count">--</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">New Since Last Sweep</span>
+            <strong id="new-candidate-count">--</strong>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Green Lights</span>
+            <strong id="passed-count">--</strong>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard-grid">
+        <section class="panel board-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">LIVE BOARD</p>
+              <h2>Breaking Feed</h2>
+            </div>
+            <span class="section-pill">Poly</span>
+          </div>
+          <div id="breaking-feed" class="feed-list"></div>
+        </section>
+
+        <section class="panel verdict-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">VERDICT</p>
+              <h2>Grok Review</h2>
+            </div>
+            <span class="section-pill">X Search</span>
+          </div>
+
+          <div class="verdict-block">
+            <h3>New Candidates</h3>
+            <div id="new-candidates" class="compact-list"></div>
+          </div>
+
+          <div class="verdict-block">
+            <h3>Passed Topics</h3>
+            <div id="passed-topics" class="topic-stack"></div>
+          </div>
+        </section>
+
+        <section class="panel console-panel">
+          <div class="section-head">
+            <div>
+              <p class="section-kicker">CONSOLE</p>
+              <h2>Operator Notes</h2>
+            </div>
+            <span class="section-pill">Ops</span>
+          </div>
+          <div class="console-grid">
+            <div class="console-card">
+              <p class="console-label">Latest JSON</p>
+              <code>/data/cross-signal/latest.json</code>
+            </div>
+            <div class="console-card">
+              <p class="console-label">Seen State</p>
+              <code>/data/cross-signal/seen_candidates.json</code>
+            </div>
+            <div class="console-card">
+              <p class="console-label">Run Command</p>
+              <code>./scripts/run-cross-signal-grok.sh</code>
+            </div>
+            <div class="console-card">
+              <p class="console-label">Cron Install</p>
+              <code>./scripts/install-cross-signal-cron.sh</code>
+            </div>
+          </div>
+          <pre id="raw-preview" class="raw-preview"></pre>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

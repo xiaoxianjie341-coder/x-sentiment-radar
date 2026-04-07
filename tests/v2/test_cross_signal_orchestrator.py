@@ -88,6 +88,8 @@ def test_cross_signal_orchestrator_emits_only_verified_topics():
     assert report.new_candidate_count == 2
     assert report.passed_count == 1
     assert [item.topic for item in report.topics] == ["kitkat-heist-response"]
+    assert [item.slug for item in report.candidates] == ["kitkat-heist-response", "openai-release-gpt6-this-week"]
+    assert [item.slug for item in report.new_candidates] == ["kitkat-heist-response", "openai-release-gpt6-this-week"]
 
 
 def test_cross_signal_orchestrator_only_evaluates_new_candidates_and_updates_state():
@@ -111,3 +113,5 @@ def test_cross_signal_orchestrator_only_evaluates_new_candidates_and_updates_sta
     assert report.passed_count == 1
     assert gate.calls == ["openai-release-gpt6-this-week"]
     assert state_store.saved == ("kitkat-heist-response", "openai-release-gpt6-this-week")
+    assert [item.slug for item in report.candidates] == ["kitkat-heist-response", "openai-release-gpt6-this-week"]
+    assert [item.slug for item in report.new_candidates] == ["openai-release-gpt6-this-week"]
