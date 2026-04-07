@@ -14,6 +14,8 @@ const actionStatusEl = document.querySelector("#action-status");
 
 let latestData = null;
 let scheduleEnabled = false;
+let reviewAllRunning = false;
+let reviewAllPoller = null;
 
 init().catch((error) => {
   actionStatusEl.textContent = `页面加载失败：${String(error?.message || error)}`;
@@ -23,6 +25,7 @@ async function init() {
   const [data, meta] = await Promise.all([loadData(), loadMeta()]);
   latestData = data;
   scheduleEnabled = Boolean(meta.schedule_enabled);
+  reviewAllRunning = Boolean(meta.review_all_running);
   bindActions();
   render(data);
 }
@@ -47,6 +50,7 @@ function render(data) {
   renderMetrics(data);
   renderSidePanel(data);
   renderBreakingFeed(data);
+  updateScheduleButton();
 }
 
 function bindActions() {
@@ -201,6 +205,14 @@ async function triggerRun(mode) {
     if (!response.ok || !payload.ok) {
       throw new Error(payload.stderr || payload.stdout || "检查失败");
     }
+    if (mode === "review_all" && payload.running) {
+      reviewAllRunning = true;
+      latestData = payload.latest || latestData;
+      if (latestData) render(latestData);
+      actionStatusEl.textContent = payload.started ? "整页重审已经在后台开始运行，你可以直接刷新观察结果。" : "整页重审已在后台运行中。";
+      startReviewPolling();
+      return;
+    }
     latestData = payload.latest;
     render(latestData);
     actionStatusEl.textContent = mode === "incremental" ? "已完成新事件检查。" : "已完成整页重审。";
@@ -238,13 +250,51 @@ async function toggleSchedule() {
 
 function setBusy(busy, text = "") {
   runCheckBtn.disabled = busy;
-  reviewAllBtn.disabled = busy;
+  reviewAllBtn.disabled = busy && !reviewAllRunning;
   scheduleBtn.disabled = busy;
   if (text) actionStatusEl.textContent = text;
 }
 
 function updateScheduleButton() {
   scheduleBtn.textContent = scheduleEnabled ? "关闭每30分钟自动检查" : "开启每30分钟自动检查";
+  reviewAllBtn.textContent = reviewAllRunning ? "整页重审进行中..." : "重审当前整页";
+}
+
+function startReviewPolling() {
+  if (reviewAllPoller) return;
+  reviewAllPoller = window.setInterval(async () => {
+    try {
+      const response = await fetch("/api/job-status", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      reviewAllRunning = Boolean(payload.review_all_running);
+      if (payload.latest) {
+        latestData = payload.latest;
+        render(latestData);
+      }
+      if (!reviewAllRunning) {
+        actionStatusEl.textContent = "整页重审已完成。";
+        stopReviewPolling();
+      } else {
+        actionStatusEl.textContent = "整页重审进行中，结果会逐步写入卡片。";
+        updateScheduleButton();
+      }
+    } catch {
+      // Keep polling quiet on transient failures.
+    }
+  }, 2500);
+}
+
+function stopReviewPolling() {
+  if (reviewAllPoller) {
+    window.clearInterval(reviewAllPoller);
+    reviewAllPoller = null;
+  }
+  reviewAllRunning = false;
+  runCheckBtn.disabled = false;
+  reviewAllBtn.disabled = false;
+  scheduleBtn.disabled = false;
+  updateScheduleButton();
 }
 
 function statBox(label, value) {
