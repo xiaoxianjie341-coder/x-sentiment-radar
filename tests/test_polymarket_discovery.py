@@ -105,6 +105,7 @@ def test_polymarket_signal_scout_merges_breaking_and_anomaly_without_duplicates(
     )
     scout = PolymarketSignalScout(
         html_loader=lambda: html,
+        filter_candidates=True,
         anomaly_loader=lambda: [
             {
                 "id": "1b",
@@ -162,3 +163,42 @@ def test_polymarket_signal_scout_respects_candidate_limit():
     candidates = scout.run()
 
     assert [item.slug for item in candidates] == ["openai-release-gpt6-this-week"]
+
+
+def test_polymarket_signal_scout_can_return_all_breaking_items_without_filtering():
+    html = _breaking_html(
+        {
+            "id": "1",
+            "title": "What price will Chainlink hit in April?",
+            "slug": "what-price-will-chainlink-hit-in-april",
+            "volume24hr": 99000,
+            "liquidity": 20000,
+            "firstTag": "Crypto",
+            "firstTagSlug": "crypto",
+            "secondTag": "Crypto Prices",
+            "secondTagSlug": "crypto-prices",
+            "markets": [{"id": "m1"}],
+        },
+        {
+            "id": "2",
+            "title": "NBA Atlantic Division Winner",
+            "slug": "nba-2025-26-atlantic-division-winner",
+            "volume24hr": 34000,
+            "liquidity": 9000,
+            "firstTag": "Sports",
+            "firstTagSlug": "sports",
+            "markets": [{"id": "m2"}],
+        },
+    )
+    scout = PolymarketSignalScout(
+        html_loader=lambda: html,
+        candidate_limit=0,
+        filter_candidates=False,
+    )
+
+    candidates = scout.run()
+
+    assert [item.slug for item in candidates] == [
+        "what-price-will-chainlink-hit-in-april",
+        "nba-2025-26-atlantic-division-winner",
+    ]

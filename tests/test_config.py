@@ -43,7 +43,8 @@ def test_load_settings_defaults_obsidian_contract():
     assert settings.cross_signal_xai_base_url == "https://api.x.ai/v1"
     assert settings.cross_signal_xai_model == "grok-4-1-fast-reasoning"
     assert settings.cross_signal_xai_reasoning_effort == "low"
-    assert settings.cross_signal_candidate_limit == 3
+    assert settings.cross_signal_candidate_limit == 0
+    assert settings.cross_signal_filter_candidates is False
 
 
 def test_load_settings_example_config_resolves_repo_relative_paths():

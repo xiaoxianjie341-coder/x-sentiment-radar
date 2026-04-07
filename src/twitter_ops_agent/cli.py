@@ -268,7 +268,10 @@ def build_browser_x_session_client(settings):
 
 
 def build_cross_signal_runtime(settings):
-    scout = PolymarketSignalScout(candidate_limit=settings.cross_signal_candidate_limit)
+    scout = PolymarketSignalScout(
+        candidate_limit=settings.cross_signal_candidate_limit,
+        filter_candidates=settings.cross_signal_filter_candidates,
+    )
     if settings.cross_signal_xai_api_key and settings.cross_signal_xai_model:
         return {
             "scout": scout,

@@ -43,29 +43,38 @@ class PolymarketSignalScout:
         self,
         *,
         breaking_url: str = BREAKING_URL,
-        candidate_limit: int = 3,
+        candidate_limit: int = 0,
+        filter_candidates: bool = False,
         html_loader: Callable[[], str] | None = None,
         anomaly_loader: Callable[[], Iterable[Mapping[str, object]]] | None = None,
     ) -> None:
         self.breaking_url = breaking_url
         self.candidate_limit = candidate_limit
+        self.filter_candidates = filter_candidates
         self.html_loader = html_loader
         self.anomaly_loader = anomaly_loader
 
     def run(self) -> list[PolymarketCandidate]:
         html = self.html_loader() if self.html_loader is not None else _fetch_html(self.breaking_url)
-        candidates = parse_breaking_candidates(html)
+        candidates = parse_breaking_candidates(html, filter_candidates=self.filter_candidates)
         if self.anomaly_loader is not None:
             candidates.extend(candidate_from_anomaly(item) for item in self.anomaly_loader())
-        deduped = _dedupe_candidates(candidate for candidate in candidates if is_relevant_candidate(candidate))
-        return deduped[: self.candidate_limit]
+        deduped = _dedupe_candidates(
+            candidate for candidate in candidates if (is_relevant_candidate(candidate) if self.filter_candidates else True)
+        )
+        if self.candidate_limit > 0:
+            return deduped[: self.candidate_limit]
+        return deduped
 
 
-def parse_breaking_candidates(html: str) -> list[PolymarketCandidate]:
+def parse_breaking_candidates(html: str, *, filter_candidates: bool = True) -> list[PolymarketCandidate]:
     payload = _extract_next_data(html)
     matches = _find_candidate_dicts(payload)
     candidates = [_candidate_from_mapping(item, source_label="breaking") for item in matches]
-    return [candidate for candidate in _dedupe_candidates(candidates) if is_relevant_candidate(candidate)]
+    deduped = _dedupe_candidates(candidates)
+    if filter_candidates:
+        return [candidate for candidate in deduped if is_relevant_candidate(candidate)]
+    return deduped
 
 
 def candidate_from_anomaly(item: Mapping[str, object]) -> PolymarketCandidate:

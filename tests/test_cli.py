@@ -105,13 +105,18 @@ def test_build_cross_signal_runtime_uses_cross_signal_thresholds(monkeypatch):
 
     monkeypatch.setattr(
         "twitter_ops_agent.cli.PolymarketSignalScout",
-        lambda candidate_limit=3: {"scout": sentinel_scout, "candidate_limit": candidate_limit},
+        lambda candidate_limit=0, filter_candidates=False: {
+            "scout": sentinel_scout,
+            "candidate_limit": candidate_limit,
+            "filter_candidates": filter_candidates,
+        },
     )
     monkeypatch.setattr("twitter_ops_agent.cli.TwscrapeCrowdClient.from_db", lambda *args, **kwargs: sentinel_client)
     runtime = build_cross_signal_runtime(settings)
 
     assert runtime["scout"]["scout"] is sentinel_scout
     assert runtime["scout"]["candidate_limit"] == 2
+    assert runtime["scout"]["filter_candidates"] is False
     assert runtime["gate"].client is sentinel_client
     assert runtime["gate"].min_posts == 4
     assert runtime["gate"].min_accounts == 3
@@ -130,14 +135,19 @@ def test_build_cross_signal_runtime_prefers_grok_when_xai_config_present(monkeyp
 
     monkeypatch.setattr(
         "twitter_ops_agent.cli.PolymarketSignalScout",
-        lambda candidate_limit=3: {"scout": sentinel_scout, "candidate_limit": candidate_limit},
+        lambda candidate_limit=0, filter_candidates=False: {
+            "scout": sentinel_scout,
+            "candidate_limit": candidate_limit,
+            "filter_candidates": filter_candidates,
+        },
     )
     monkeypatch.setattr("twitter_ops_agent.cli.build_grok_cross_signal_gate", lambda settings: sentinel_gate)
 
     runtime = build_cross_signal_runtime(settings)
 
     assert runtime["scout"]["scout"] is sentinel_scout
-    assert runtime["scout"]["candidate_limit"] == 3
+    assert runtime["scout"]["candidate_limit"] == 0
+    assert runtime["scout"]["filter_candidates"] is False
     assert runtime["gate"] is sentinel_gate
 
 
