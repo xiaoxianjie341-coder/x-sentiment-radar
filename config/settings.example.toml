@@ -75,3 +75,16 @@ attentionvc_top_signal_count = 10
 attentionvc_signal_min_views = 0
 attentionvc_signal_min_likes = 0
 attentionvc_signal_min_replies = 0
+
+# Cross-signal monitor. This is the simplest path for the Polymarket -> X
+# workflow: Polymarket produces the candidate, Grok verifies whether the topic
+# is actually spreading on X.
+cross_signal_candidate_limit = 3
+cross_signal_min_posts = 3
+cross_signal_min_accounts = 2
+cross_signal_search_limit = 20
+cross_signal_top_post_limit = 5
+cross_signal_xai_api_key = ""
+cross_signal_xai_base_url = "https://api.x.ai/v1"
+cross_signal_xai_model = "grok-4-1-fast-reasoning"
+cross_signal_xai_reasoning_effort = "low"

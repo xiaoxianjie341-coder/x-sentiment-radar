@@ -211,6 +211,20 @@ twitter-ops-agent cross-signal
 - X 上传播势能最强的前 5 条帖子
 - 当前正在跑出来的一句角度总结
 
+如果你想直接用仓库当前代码、并把结果自动保存到文件里，最省事的是：
+
+```bash
+./scripts/run-cross-signal-grok.sh
+```
+
+运行后会把最新结果保存到：
+
+```bash
+data/cross-signal/latest.json
+```
+
+这个脚本适合“先看有没有过两道关卡的 topic”，然后再决定要不要继续做深度研究。
+
 ### 第一次配置
 
 先复制配置文件：

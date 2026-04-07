@@ -43,10 +43,12 @@ class PolymarketSignalScout:
         self,
         *,
         breaking_url: str = BREAKING_URL,
+        candidate_limit: int = 3,
         html_loader: Callable[[], str] | None = None,
         anomaly_loader: Callable[[], Iterable[Mapping[str, object]]] | None = None,
     ) -> None:
         self.breaking_url = breaking_url
+        self.candidate_limit = candidate_limit
         self.html_loader = html_loader
         self.anomaly_loader = anomaly_loader
 
@@ -55,7 +57,8 @@ class PolymarketSignalScout:
         candidates = parse_breaking_candidates(html)
         if self.anomaly_loader is not None:
             candidates.extend(candidate_from_anomaly(item) for item in self.anomaly_loader())
-        return _dedupe_candidates(candidate for candidate in candidates if is_relevant_candidate(candidate))
+        deduped = _dedupe_candidates(candidate for candidate in candidates if is_relevant_candidate(candidate))
+        return deduped[: self.candidate_limit]
 
 
 def parse_breaking_candidates(html: str) -> list[PolymarketCandidate]:

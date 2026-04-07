@@ -16,6 +16,15 @@ def test_cli_parser_accepts_cross_signal():
     assert args.command == "cross-signal"
 
 
+def test_cli_parser_accepts_cross_signal_save_to(tmp_path: Path):
+    parser = build_parser()
+    out_path = tmp_path / "latest.json"
+    args = parser.parse_args(["cross-signal", "--save-to", str(out_path)])
+
+    assert args.command == "cross-signal"
+    assert args.save_to == out_path
+
+
 def test_build_v2_runtime_falls_back_to_xhunt_and_twscrape_when_attentionvc_is_missing(monkeypatch, tmp_path: Path):
     settings = load_settings(config_path=None, env={})
     repo = object()
@@ -88,16 +97,21 @@ def test_build_cross_signal_runtime_uses_cross_signal_thresholds(monkeypatch):
             "TWITTER_OPS_AGENT_CROSS_SIGNAL_MIN_POSTS": "4",
             "TWITTER_OPS_AGENT_CROSS_SIGNAL_MIN_ACCOUNTS": "3",
             "TWITTER_OPS_AGENT_CROSS_SIGNAL_SEARCH_LIMIT": "25",
+            "TWITTER_OPS_AGENT_CROSS_SIGNAL_CANDIDATE_LIMIT": "2",
         },
     )
     sentinel_scout = object()
     sentinel_client = object()
 
-    monkeypatch.setattr("twitter_ops_agent.cli.PolymarketSignalScout", lambda: sentinel_scout)
+    monkeypatch.setattr(
+        "twitter_ops_agent.cli.PolymarketSignalScout",
+        lambda candidate_limit=3: {"scout": sentinel_scout, "candidate_limit": candidate_limit},
+    )
     monkeypatch.setattr("twitter_ops_agent.cli.TwscrapeCrowdClient.from_db", lambda *args, **kwargs: sentinel_client)
     runtime = build_cross_signal_runtime(settings)
 
-    assert runtime["scout"] is sentinel_scout
+    assert runtime["scout"]["scout"] is sentinel_scout
+    assert runtime["scout"]["candidate_limit"] == 2
     assert runtime["gate"].client is sentinel_client
     assert runtime["gate"].min_posts == 4
     assert runtime["gate"].min_accounts == 3
@@ -109,18 +123,21 @@ def test_build_cross_signal_runtime_prefers_grok_when_xai_config_present(monkeyp
         config_path=None,
         env={
             "TWITTER_OPS_AGENT_CROSS_SIGNAL_XAI_API_KEY": "secret",
-            "TWITTER_OPS_AGENT_CROSS_SIGNAL_XAI_MODEL": "grok-4.20-reasoning",
         },
     )
     sentinel_scout = object()
     sentinel_gate = object()
 
-    monkeypatch.setattr("twitter_ops_agent.cli.PolymarketSignalScout", lambda: sentinel_scout)
+    monkeypatch.setattr(
+        "twitter_ops_agent.cli.PolymarketSignalScout",
+        lambda candidate_limit=3: {"scout": sentinel_scout, "candidate_limit": candidate_limit},
+    )
     monkeypatch.setattr("twitter_ops_agent.cli.build_grok_cross_signal_gate", lambda settings: sentinel_gate)
 
     runtime = build_cross_signal_runtime(settings)
 
-    assert runtime["scout"] is sentinel_scout
+    assert runtime["scout"]["scout"] is sentinel_scout
+    assert runtime["scout"]["candidate_limit"] == 3
     assert runtime["gate"] is sentinel_gate
 
 
@@ -145,3 +162,28 @@ def test_main_cross_signal_prints_json_report(monkeypatch, capsys):
     assert exit_code == 0
     assert '"candidate_count": 2' in output
     assert '"passed_count": 1' in output
+
+
+def test_main_cross_signal_can_save_json_report(monkeypatch, capsys, tmp_path: Path):
+    monkeypatch.setattr("twitter_ops_agent.cli.resolve_config_path", lambda config: None)
+    monkeypatch.setattr("twitter_ops_agent.cli.load_settings", lambda config_path, env: object())
+
+    class StubReport:
+        candidate_count = 1
+        passed_count = 1
+        topics = ()
+
+    class StubOrchestrator:
+        def run(self):
+            return StubReport()
+
+    monkeypatch.setattr("twitter_ops_agent.cli.build_cross_signal_orchestrator", lambda settings: StubOrchestrator())
+    out_path = tmp_path / "latest.json"
+
+    exit_code = main(["cross-signal", "--save-to", str(out_path)])
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert out_path.exists()
+    assert '"candidate_count": 1' in output
+    assert '"passed_count": 1' in out_path.read_text(encoding="utf-8")

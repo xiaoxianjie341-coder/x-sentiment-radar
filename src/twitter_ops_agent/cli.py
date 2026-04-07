@@ -41,7 +41,8 @@ def build_parser() -> argparse.ArgumentParser:
     doctor_parser.add_argument("--json", action="store_true", help="Emit the doctor report as JSON.")
 
     subcommands.add_parser("run-v2", help="Run the sentiment-first workflow.")
-    subcommands.add_parser("cross-signal", help="Run the Polymarket + X cross-signal monitor.")
+    cross_signal_parser = subcommands.add_parser("cross-signal", help="Run the Polymarket + X cross-signal monitor.")
+    cross_signal_parser.add_argument("--save-to", type=Path, default=None, help="Optional path to save the JSON report.")
     return parser
 
 
@@ -95,17 +96,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         except Exception as exc:  # noqa: BLE001
             print(json.dumps({"error": str(exc)}, ensure_ascii=False, indent=2), file=sys.stderr)
             return 1
-        print(
-            json.dumps(
-                {
-                    "candidate_count": report.candidate_count,
-                    "passed_count": report.passed_count,
-                    "topics": [_serialize_cross_signal_alert(item) for item in report.topics],
-                },
-                ensure_ascii=False,
-                indent=2,
-            )
+        payload = json.dumps(
+            {
+                "candidate_count": report.candidate_count,
+                "passed_count": report.passed_count,
+                "topics": [_serialize_cross_signal_alert(item) for item in report.topics],
+            },
+            ensure_ascii=False,
+            indent=2,
         )
+        print(payload)
+        if args.save_to is not None:
+            args.save_to.parent.mkdir(parents=True, exist_ok=True)
+            args.save_to.write_text(payload + "\n", encoding="utf-8")
         return 0
 
     parser.error(f"unsupported command: {args.command}")
@@ -265,7 +268,7 @@ def build_browser_x_session_client(settings):
 
 
 def build_cross_signal_runtime(settings):
-    scout = PolymarketSignalScout()
+    scout = PolymarketSignalScout(candidate_limit=settings.cross_signal_candidate_limit)
     if settings.cross_signal_xai_api_key and settings.cross_signal_xai_model:
         return {
             "scout": scout,

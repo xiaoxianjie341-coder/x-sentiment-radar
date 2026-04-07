@@ -80,6 +80,7 @@ class AppSettings:
     cross_signal_min_accounts: int
     cross_signal_search_limit: int
     cross_signal_top_post_limit: int
+    cross_signal_candidate_limit: int
     cross_signal_xai_api_key: str
     cross_signal_xai_base_url: str
     cross_signal_xai_model: str
@@ -148,10 +149,11 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "cross_signal_min_accounts": 2,
         "cross_signal_search_limit": 20,
         "cross_signal_top_post_limit": 5,
+        "cross_signal_candidate_limit": 3,
         "cross_signal_xai_api_key": "",
         "cross_signal_xai_base_url": "https://api.x.ai/v1",
-        "cross_signal_xai_model": "",
-        "cross_signal_xai_reasoning_effort": "",
+        "cross_signal_xai_model": "grok-4-1-fast-reasoning",
+        "cross_signal_xai_reasoning_effort": "low",
     }
 
     config_values: dict[str, Any] = {}
@@ -229,6 +231,7 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         cross_signal_min_accounts=int(values["cross_signal_min_accounts"]),
         cross_signal_search_limit=int(values["cross_signal_search_limit"]),
         cross_signal_top_post_limit=int(values["cross_signal_top_post_limit"]),
+        cross_signal_candidate_limit=int(values["cross_signal_candidate_limit"]),
         cross_signal_xai_api_key=str(values["cross_signal_xai_api_key"]),
         cross_signal_xai_base_url=str(values["cross_signal_xai_base_url"]),
         cross_signal_xai_model=str(values["cross_signal_xai_model"]),
@@ -301,6 +304,7 @@ def _load_env_overrides(env: Mapping[str, str], base_dir: Path) -> dict[str, Any
             "cross_signal_min_accounts",
             "cross_signal_search_limit",
             "cross_signal_top_post_limit",
+            "cross_signal_candidate_limit",
         }:
             overrides[field_name] = int(value)
         elif field_name in {"attentionvc_use_rising", "twscrape_search_enabled"}:

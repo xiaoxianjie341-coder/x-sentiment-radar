@@ -119,7 +119,7 @@ def _parse_gate_output(raw_text: str) -> dict[str, object]:
         "reason_if_not_viral": str(payload.get("reason_if_not_viral", "")).strip(),
         "top_5_posts": [item for item in posts if isinstance(item, dict)][:5],
         "one_line_angle": str(payload.get("one_line_angle", "")).strip(),
-        "confidence": int(payload.get("confidence", 0) or 0),
+        "confidence": _coerce_confidence(payload.get("confidence", 0)),
     }
 
 
@@ -132,3 +132,22 @@ def _system_prompt() -> str:
         "top_5_posts must be a list of objects with keys text, url, author_handle, retweet_velocity, secondary_engagement_desc.\n"
         "If the topic is not meaningfully spreading, set is_viral to false."
     )
+
+
+def _coerce_confidence(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    text = str(value).strip().lower()
+    if not text:
+        return 0
+    if text.isdigit():
+        return int(text)
+    if text == "high":
+        return 85
+    if text == "medium":
+        return 60
+    if text == "low":
+        return 30
+    return 0

@@ -121,3 +121,33 @@ def test_grok_cross_signal_gate_maps_structured_output_to_alert(monkeypatch):
     assert alert.distinct_account_count == 2
     assert alert.angle_summary == "Brand mishap plus meme remix is the winning angle."
     assert [post.author_handle for post in alert.top_posts] == ["brandwatch", "adnews"]
+
+
+def test_grok_cross_signal_gate_accepts_non_numeric_confidence(monkeypatch):
+    def stub_urlopen(req, timeout):  # noqa: ANN001, ARG001
+        return StubResponse(
+            {
+                "output_text": json.dumps(
+                    {
+                        "is_viral": True,
+                        "reason_if_not_viral": "",
+                        "top_5_posts": [],
+                        "one_line_angle": "Angle",
+                        "confidence": "high",
+                    }
+                )
+            }
+        )
+
+    monkeypatch.setattr("twitter_ops_agent.v2.agents.grok_cross_signal_gate.request.urlopen", stub_urlopen)
+    gate = GrokCrossSignalGate(
+        config=XaiSearchConfig(
+            api_key="secret",
+            model="grok-4-1-fast-reasoning",
+        )
+    )
+
+    alert = gate.evaluate(_candidate(), queries=("kitkat heist",))
+
+    assert alert is not None
+    assert alert.angle_summary == "Angle"

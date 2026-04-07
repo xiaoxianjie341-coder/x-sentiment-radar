@@ -129,3 +129,36 @@ def test_polymarket_signal_scout_merges_breaking_and_anomaly_without_duplicates(
 
     assert [item.slug for item in candidates] == ["openai-release-gpt6-this-week"]
     assert all(isinstance(item, PolymarketCandidate) for item in candidates)
+
+
+def test_polymarket_signal_scout_respects_candidate_limit():
+    html = _breaking_html(
+        {
+            "id": "1",
+            "title": "Will OpenAI release GPT-6 this week?",
+            "slug": "openai-release-gpt6-this-week",
+            "volume24hr": 120000,
+            "liquidity": 50000,
+            "firstTag": "Tech",
+            "firstTagSlug": "tech",
+            "markets": [{"id": "m1"}],
+        },
+        {
+            "id": "2",
+            "title": "Will KitKat issue a statement about the heist by April 8?",
+            "slug": "kitkat-heist-response",
+            "volume24hr": 55000,
+            "liquidity": 12000,
+            "firstTag": "Culture",
+            "firstTagSlug": "pop-culture",
+            "markets": [{"id": "m2"}],
+        },
+    )
+    scout = PolymarketSignalScout(
+        html_loader=lambda: html,
+        candidate_limit=1,
+    )
+
+    candidates = scout.run()
+
+    assert [item.slug for item in candidates] == ["openai-release-gpt6-this-week"]
