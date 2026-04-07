@@ -17,8 +17,11 @@ class StubScout:
 @dataclass
 class StubGate:
     passed_for: set[str]
+    calls: list[str] | None = None
 
     def evaluate(self, candidate):
+        if self.calls is not None:
+            self.calls.append(candidate.slug)
         if candidate.slug not in self.passed_for:
             return None
         return CrossSignalAlert(
@@ -56,6 +59,18 @@ class Candidate:
         self.source_label = "breaking"
 
 
+@dataclass
+class StubStateStore:
+    seen: tuple[str, ...] = ()
+    saved: tuple[str, ...] = ()
+
+    def load_seen(self) -> tuple[str, ...]:
+        return self.seen
+
+    def save_seen(self, seen: tuple[str, ...]) -> None:
+        self.saved = seen
+
+
 def test_cross_signal_orchestrator_emits_only_verified_topics():
     orchestrator = CrossSignalOrchestrator(
         scout=StubScout(
@@ -70,5 +85,29 @@ def test_cross_signal_orchestrator_emits_only_verified_topics():
     report = orchestrator.run()
 
     assert report.candidate_count == 2
+    assert report.new_candidate_count == 2
     assert report.passed_count == 1
     assert [item.topic for item in report.topics] == ["kitkat-heist-response"]
+
+
+def test_cross_signal_orchestrator_only_evaluates_new_candidates_and_updates_state():
+    state_store = StubStateStore(seen=("kitkat-heist-response",))
+    gate = StubGate({"openai-release-gpt6-this-week"}, calls=[])
+    orchestrator = CrossSignalOrchestrator(
+        scout=StubScout(
+            [
+                Candidate("kitkat-heist-response", "Will KitKat issue a statement about the heist by April 8?"),
+                Candidate("openai-release-gpt6-this-week", "Will OpenAI release GPT-6 this week?"),
+            ]
+        ),
+        gate=gate,
+        state_store=state_store,
+    )
+
+    report = orchestrator.run()
+
+    assert report.candidate_count == 2
+    assert report.new_candidate_count == 1
+    assert report.passed_count == 1
+    assert gate.calls == ["openai-release-gpt6-this-week"]
+    assert state_store.saved == ("kitkat-heist-response", "openai-release-gpt6-this-week")

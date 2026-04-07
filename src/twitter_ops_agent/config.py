@@ -82,6 +82,7 @@ class AppSettings:
     cross_signal_top_post_limit: int
     cross_signal_candidate_limit: int
     cross_signal_filter_candidates: bool
+    cross_signal_state_file: Path
     cross_signal_xai_api_key: str
     cross_signal_xai_base_url: str
     cross_signal_xai_model: str
@@ -152,6 +153,7 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "cross_signal_top_post_limit": 5,
         "cross_signal_candidate_limit": 0,
         "cross_signal_filter_candidates": False,
+        "cross_signal_state_file": project_root / "data/cross-signal/seen_candidates.json",
         "cross_signal_xai_api_key": "",
         "cross_signal_xai_base_url": "https://api.x.ai/v1",
         "cross_signal_xai_model": "grok-4-1-fast-reasoning",
@@ -235,6 +237,7 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         cross_signal_top_post_limit=int(values["cross_signal_top_post_limit"]),
         cross_signal_candidate_limit=int(values["cross_signal_candidate_limit"]),
         cross_signal_filter_candidates=bool(values["cross_signal_filter_candidates"]),
+        cross_signal_state_file=_coerce_path(values["cross_signal_state_file"], project_root),
         cross_signal_xai_api_key=str(values["cross_signal_xai_api_key"]),
         cross_signal_xai_base_url=str(values["cross_signal_xai_base_url"]),
         cross_signal_xai_model=str(values["cross_signal_xai_model"]),
@@ -312,7 +315,7 @@ def _load_env_overrides(env: Mapping[str, str], base_dir: Path) -> dict[str, Any
             overrides[field_name] = int(value)
         elif field_name in {"attentionvc_use_rising", "twscrape_search_enabled", "cross_signal_filter_candidates"}:
             overrides[field_name] = _coerce_bool(value)
-        elif field_name in {"obsidian_vault", "obsidian_root", "twscrape_db", "x_fetcher_script", "sqlite_db"}:
+        elif field_name in {"obsidian_vault", "obsidian_root", "twscrape_db", "x_fetcher_script", "sqlite_db", "cross_signal_state_file"}:
             overrides[field_name] = _coerce_path(value, base_dir)
         else:
             overrides[field_name] = value
@@ -324,7 +327,7 @@ def _normalize_values(raw: Mapping[str, Any], base_dir: Path) -> dict[str, Any]:
     normalized: dict[str, Any] = {}
 
     for key, value in raw.items():
-        if key in {"obsidian_vault", "obsidian_root", "twscrape_db", "x_fetcher_script", "sqlite_db"}:
+        if key in {"obsidian_vault", "obsidian_root", "twscrape_db", "x_fetcher_script", "sqlite_db", "cross_signal_state_file"}:
             normalized[key] = _coerce_path(value, base_dir)
         elif key in {"high_signal_source_handles", "attentionvc_categories", "attentionvc_search_queries", "xhunt_groups"}:
             normalized[key] = _coerce_str_tuple(value)

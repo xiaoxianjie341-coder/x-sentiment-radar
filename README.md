@@ -225,6 +225,19 @@ data/cross-signal/latest.json
 
 这个脚本适合“先看有没有过两道关卡的 topic”，然后再决定要不要继续做深度研究。
 
+如果你想按“每 30 分钟巡检一次，只处理新进入 Breaking 的事件”来跑，推荐顺序是：
+
+```bash
+./scripts/prime-cross-signal-state.sh
+./scripts/install-cross-signal-cron.sh
+```
+
+其中：
+
+- `prime-cross-signal-state.sh` 会把当前 Breaking 页事件记成“已看过”
+- `install-cross-signal-cron.sh` 会安装一个本地 cron，每 30 分钟跑一次
+- 定时日志会写到 `data/cross-signal/cron.log`
+
 ### 第一次配置
 
 先复制配置文件：

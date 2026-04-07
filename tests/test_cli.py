@@ -151,12 +151,36 @@ def test_build_cross_signal_runtime_prefers_grok_when_xai_config_present(monkeyp
     assert runtime["gate"] is sentinel_gate
 
 
+def test_main_cross_signal_prints_new_candidate_count(monkeypatch, capsys):
+    monkeypatch.setattr("twitter_ops_agent.cli.resolve_config_path", lambda config: None)
+    monkeypatch.setattr("twitter_ops_agent.cli.load_settings", lambda config_path, env: object())
+
+    class StubReport:
+        candidate_count = 5
+        new_candidate_count = 2
+        passed_count = 1
+        topics = ()
+
+    class StubOrchestrator:
+        def run(self):
+            return StubReport()
+
+    monkeypatch.setattr("twitter_ops_agent.cli.build_cross_signal_orchestrator", lambda settings: StubOrchestrator())
+
+    exit_code = main(["cross-signal"])
+    output = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert '"new_candidate_count": 2' in output
+
+
 def test_main_cross_signal_prints_json_report(monkeypatch, capsys):
     monkeypatch.setattr("twitter_ops_agent.cli.resolve_config_path", lambda config: None)
     monkeypatch.setattr("twitter_ops_agent.cli.load_settings", lambda config_path, env: object())
 
     class StubReport:
         candidate_count = 2
+        new_candidate_count = 1
         passed_count = 1
         topics = ()
 
@@ -180,6 +204,7 @@ def test_main_cross_signal_can_save_json_report(monkeypatch, capsys, tmp_path: P
 
     class StubReport:
         candidate_count = 1
+        new_candidate_count = 1
         passed_count = 1
         topics = ()
 

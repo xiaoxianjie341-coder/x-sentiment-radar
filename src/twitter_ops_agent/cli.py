@@ -26,7 +26,7 @@ from twitter_ops_agent.v2.agents.crowd_sense import CrowdSenseAgent
 from twitter_ops_agent.v2.agents.hydration_agent import HydrationAgent
 from twitter_ops_agent.v2.agents.priority_gate import PriorityGateAgent
 from twitter_ops_agent.v2.agents.topic_scout import TopicScoutAgent
-from twitter_ops_agent.v2.cross_signal import CrossSignalOrchestrator
+from twitter_ops_agent.v2.cross_signal import CrossSignalOrchestrator, CrossSignalStateStore
 from twitter_ops_agent.v2.orchestrator import V2Orchestrator
 from twitter_ops_agent.v2.output.publisher import TopicWorkspacePublisher
 from twitter_ops_agent.writer.llm_writer import LLMWriterConfig
@@ -99,6 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         payload = json.dumps(
             {
                 "candidate_count": report.candidate_count,
+                "new_candidate_count": report.new_candidate_count,
                 "passed_count": report.passed_count,
                 "topics": [_serialize_cross_signal_alert(item) for item in report.topics],
             },
@@ -298,6 +299,7 @@ def build_cross_signal_orchestrator(settings):
     return CrossSignalOrchestrator(
         scout=runtime["scout"],
         gate=runtime["gate"],
+        state_store=CrossSignalStateStore(settings.cross_signal_state_file),
     )
 
 
