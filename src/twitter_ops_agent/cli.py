@@ -20,6 +20,7 @@ from twitter_ops_agent.research.crowd_context import CrowdContextService, LLMCro
 from twitter_ops_agent.research.twscrape_client import TwscrapeCrowdClient
 from twitter_ops_agent.storage.repository import SqliteRepository
 from twitter_ops_agent.v2.agents.cross_signal_gate import CrossSignalGate
+from twitter_ops_agent.v2.agents.grok_cross_signal_gate import GrokCrossSignalGate, XaiSearchConfig
 from twitter_ops_agent.v2.agents.angle_synthesizer import AngleSynthesizerAgent
 from twitter_ops_agent.v2.agents.crowd_sense import CrowdSenseAgent
 from twitter_ops_agent.v2.agents.hydration_agent import HydrationAgent
@@ -264,8 +265,14 @@ def build_browser_x_session_client(settings):
 
 
 def build_cross_signal_runtime(settings):
+    scout = PolymarketSignalScout()
+    if settings.cross_signal_xai_api_key and settings.cross_signal_xai_model:
+        return {
+            "scout": scout,
+            "gate": build_grok_cross_signal_gate(settings),
+        }
     return {
-        "scout": PolymarketSignalScout(),
+        "scout": scout,
         "gate": CrossSignalGate(
             client=TwscrapeCrowdClient.from_db(
                 settings.twscrape_db,
@@ -285,6 +292,17 @@ def build_cross_signal_orchestrator(settings):
     return CrossSignalOrchestrator(
         scout=runtime["scout"],
         gate=runtime["gate"],
+    )
+
+
+def build_grok_cross_signal_gate(settings):
+    return GrokCrossSignalGate(
+        config=XaiSearchConfig(
+            api_key=settings.cross_signal_xai_api_key,
+            base_url=settings.cross_signal_xai_base_url,
+            model=settings.cross_signal_xai_model,
+            reasoning_effort=settings.cross_signal_xai_reasoning_effort,
+        )
     )
 
 

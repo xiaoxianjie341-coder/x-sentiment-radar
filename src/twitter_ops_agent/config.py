@@ -80,6 +80,10 @@ class AppSettings:
     cross_signal_min_accounts: int
     cross_signal_search_limit: int
     cross_signal_top_post_limit: int
+    cross_signal_xai_api_key: str
+    cross_signal_xai_base_url: str
+    cross_signal_xai_model: str
+    cross_signal_xai_reasoning_effort: str
 
 
 def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None = None) -> AppSettings:
@@ -144,6 +148,10 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         "cross_signal_min_accounts": 2,
         "cross_signal_search_limit": 20,
         "cross_signal_top_post_limit": 5,
+        "cross_signal_xai_api_key": "",
+        "cross_signal_xai_base_url": "https://api.x.ai/v1",
+        "cross_signal_xai_model": "",
+        "cross_signal_xai_reasoning_effort": "",
     }
 
     config_values: dict[str, Any] = {}
@@ -221,6 +229,10 @@ def load_settings(config_path: Path | None = None, env: Mapping[str, str] | None
         cross_signal_min_accounts=int(values["cross_signal_min_accounts"]),
         cross_signal_search_limit=int(values["cross_signal_search_limit"]),
         cross_signal_top_post_limit=int(values["cross_signal_top_post_limit"]),
+        cross_signal_xai_api_key=str(values["cross_signal_xai_api_key"]),
+        cross_signal_xai_base_url=str(values["cross_signal_xai_base_url"]),
+        cross_signal_xai_model=str(values["cross_signal_xai_model"]),
+        cross_signal_xai_reasoning_effort=str(values["cross_signal_xai_reasoning_effort"]),
     )
 
 

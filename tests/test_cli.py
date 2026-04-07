@@ -104,6 +104,26 @@ def test_build_cross_signal_runtime_uses_cross_signal_thresholds(monkeypatch):
     assert runtime["gate"].search_limit == 25
 
 
+def test_build_cross_signal_runtime_prefers_grok_when_xai_config_present(monkeypatch):
+    settings = load_settings(
+        config_path=None,
+        env={
+            "TWITTER_OPS_AGENT_CROSS_SIGNAL_XAI_API_KEY": "secret",
+            "TWITTER_OPS_AGENT_CROSS_SIGNAL_XAI_MODEL": "grok-4.20-reasoning",
+        },
+    )
+    sentinel_scout = object()
+    sentinel_gate = object()
+
+    monkeypatch.setattr("twitter_ops_agent.cli.PolymarketSignalScout", lambda: sentinel_scout)
+    monkeypatch.setattr("twitter_ops_agent.cli.build_grok_cross_signal_gate", lambda settings: sentinel_gate)
+
+    runtime = build_cross_signal_runtime(settings)
+
+    assert runtime["scout"] is sentinel_scout
+    assert runtime["gate"] is sentinel_gate
+
+
 def test_main_cross_signal_prints_json_report(monkeypatch, capsys):
     monkeypatch.setattr("twitter_ops_agent.cli.resolve_config_path", lambda config: None)
     monkeypatch.setattr("twitter_ops_agent.cli.load_settings", lambda config_path, env: object())
