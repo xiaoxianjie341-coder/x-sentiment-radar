@@ -113,6 +113,9 @@ def _to_candidate_preview(candidate: object) -> CrossSignalCandidate:
         secondary_category_slug=str(getattr(candidate, "secondary_category_slug", "")).strip(),
         volume_24h=float(getattr(candidate, "volume_24h", 0.0) or 0.0),
         liquidity=float(getattr(candidate, "liquidity", 0.0) or 0.0),
+        current_probability=float(getattr(candidate, "current_probability", 0.0) or 0.0),
+        probability_change_24h=float(getattr(candidate, "probability_change_24h", 0.0) or 0.0),
+        change_direction=str(getattr(candidate, "change_direction", "")).strip(),
     )
 
 

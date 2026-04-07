@@ -17,7 +17,7 @@ if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
 fi
 
 cd "$ROOT_DIR"
-nohup python3 -m http.server "$PORT" >"$LOG_FILE" 2>&1 &
+nohup python3 "$ROOT_DIR/scripts/serve-cross-signal-dashboard.py" "$PORT" >"$LOG_FILE" 2>&1 &
 echo $! > "$PID_FILE"
 sleep 1
 open "$URL" >/dev/null 2>&1 || true

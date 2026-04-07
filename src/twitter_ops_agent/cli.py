@@ -343,6 +343,9 @@ def _serialize_cross_signal_candidate(candidate: CrossSignalCandidate) -> dict[s
         "secondary_category_slug": candidate.secondary_category_slug,
         "volume_24h": candidate.volume_24h,
         "liquidity": candidate.liquidity,
+        "current_probability": getattr(candidate, "current_probability", 0.0),
+        "probability_change_24h": getattr(candidate, "probability_change_24h", 0.0),
+        "change_direction": getattr(candidate, "change_direction", ""),
     }
 
 

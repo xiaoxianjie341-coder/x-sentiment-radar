@@ -127,6 +127,49 @@ body::before {
   font-size: 15px;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.action-btn {
+  appearance: none;
+  border: 1px solid rgba(96, 184, 255, 0.22);
+  background: rgba(8, 18, 39, 0.78);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(96, 184, 255, 0.44);
+}
+
+.action-btn:disabled {
+  opacity: 0.55;
+  cursor: progress;
+  transform: none;
+}
+
+.action-btn--primary {
+  background: linear-gradient(135deg, rgba(67, 120, 255, 0.92), rgba(51, 193, 255, 0.86));
+  color: #f4fbff;
+  border-color: transparent;
+}
+
+.hero-status {
+  margin: 12px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .hero-stats {
   display: grid;
   gap: 16px;
@@ -154,18 +197,13 @@ body::before {
 }
 
 .board-panel,
-.verdict-panel,
-.console-panel {
+.verdict-panel {
   border-radius: 24px;
   padding: 24px;
 }
 
 .board-panel {
   min-height: 760px;
-}
-
-.console-panel {
-  grid-column: 1 / -1;
 }
 
 .section-head {
@@ -229,6 +267,20 @@ body::before {
 
 .feed-summary::-webkit-details-marker {
   display: none;
+}
+
+.feed-item--passed {
+  order: -10;
+  border-color: rgba(102, 242, 198, 0.28);
+  box-shadow: 0 24px 70px rgba(22, 72, 60, 0.28);
+}
+
+.feed-item--passed .feed-summary {
+  background: linear-gradient(180deg, rgba(11, 34, 45, 0.82), rgba(6, 18, 29, 0.8));
+}
+
+.feed-item--passed h3 {
+  color: #f5fffb;
 }
 
 .feed-item[open] .feed-summary {
@@ -475,44 +527,10 @@ body::before {
   text-decoration: underline;
 }
 
-.console-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.console-card {
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(5, 16, 36, 0.68);
-  border: 1px solid rgba(96, 184, 255, 0.12);
-}
-
-.console-card code,
-.raw-preview {
-  font-family: "IBM Plex Mono", monospace;
-}
-
-.raw-preview {
-  margin: 16px 0 0;
-  padding: 18px;
-  border-radius: 18px;
-  background: rgba(5, 12, 28, 0.8);
-  border: 1px solid rgba(96, 184, 255, 0.12);
-  color: #a9c5ff;
-  min-height: 220px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 @media (max-width: 1100px) {
   .hero-panel,
   .dashboard-grid {
     grid-template-columns: 1fr;
-  }
-
-  .console-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .drawer-grid {
@@ -534,7 +552,6 @@ body::before {
     border-radius: 20px;
   }
 
-  .console-grid,
   .feed-numbers,
   .topic-stats,
   .drawer-grid {

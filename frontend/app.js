@@ -7,22 +7,53 @@ const breakingFeedEl = document.querySelector("#breaking-feed");
 const sweepSummaryEl = document.querySelector("#sweep-summary");
 const statusLegendEl = document.querySelector("#status-legend");
 const quickActionsEl = document.querySelector("#quick-actions");
-const rawPreviewEl = document.querySelector("#raw-preview");
+const runCheckBtn = document.querySelector("#run-check-btn");
+const reviewAllBtn = document.querySelector("#review-all-btn");
+const scheduleBtn = document.querySelector("#schedule-btn");
+const actionStatusEl = document.querySelector("#action-status");
+
+let latestData = null;
+let scheduleEnabled = false;
 
 init().catch((error) => {
-  rawPreviewEl.textContent = String(error?.stack || error);
+  actionStatusEl.textContent = `页面加载失败：${String(error?.message || error)}`;
 });
 
 async function init() {
+  const [data, meta] = await Promise.all([loadData(), loadMeta()]);
+  latestData = data;
+  scheduleEnabled = Boolean(meta.schedule_enabled);
+  bindActions();
+  render(data);
+}
+
+async function loadData() {
   const response = await fetch(dataPath, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`Failed to load ${dataPath}: HTTP ${response.status}`);
   }
-  const data = await response.json();
+  return response.json();
+}
+
+async function loadMeta() {
+  const response = await fetch("/api/meta", { cache: "no-store" });
+  if (!response.ok) {
+    return { schedule_enabled: false };
+  }
+  return response.json();
+}
+
+function render(data) {
   renderMetrics(data);
   renderSidePanel(data);
   renderBreakingFeed(data);
-  rawPreviewEl.textContent = JSON.stringify(data, null, 2);
+}
+
+function bindActions() {
+  runCheckBtn.addEventListener("click", () => triggerRun("incremental"));
+  reviewAllBtn.addEventListener("click", () => triggerRun("review_all"));
+  scheduleBtn.addEventListener("click", toggleSchedule);
+  updateScheduleButton();
 }
 
 function renderMetrics(data) {
@@ -71,8 +102,8 @@ function renderBreakingFeed(data) {
               ${tagChip(item.source_label || "breaking")}
             </div>
             <div class="feed-numbers">
-              ${statBox("24h Volume", formatCompact(item.volume_24h))}
-              ${statBox("Liquidity", formatCompact(item.liquidity))}
+              ${statBox("Current", formatPercent(item.current_probability))}
+              ${statBox("24h Change", formatChange(item.probability_change_24h, item.change_direction))}
             </div>
           </summary>
           <div class="feed-drawer">
@@ -151,11 +182,69 @@ function renderSidePanel(data) {
   ].join("");
 
   quickActionsEl.innerHTML = [
-    actionCard("手动看当前轮", "./scripts/run-cross-signal-grok.sh"),
-    actionCard("强制整页重跑", "./scripts/review-all-breaking-now.sh"),
-    actionCard("初始化 seen state", "./scripts/prime-cross-signal-state.sh"),
-    actionCard("安装半小时巡检", "./scripts/install-cross-signal-cron.sh"),
+    actionCard("立即检查新事件", "按钮会运行增量检查"),
+    actionCard("重审当前整页", "按钮会让当前全部 Breaking 事件都过一遍 Grok"),
+    actionCard("30 分钟自动检查", scheduleEnabled ? "已开启，可点击按钮关闭" : "当前关闭，可点击按钮开启"),
+    actionCard("已通过热点", `${data.passed_count ?? 0} 条，现在会在左侧自动置顶`),
   ].join("");
+}
+
+async function triggerRun(mode) {
+  setBusy(true, mode === "incremental" ? "正在检查有没有新事件..." : "正在重审当前整页，请稍等...");
+  try {
+    const response = await fetch("/api/run-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.stderr || payload.stdout || "检查失败");
+    }
+    latestData = payload.latest;
+    render(latestData);
+    actionStatusEl.textContent = mode === "incremental" ? "已完成新事件检查。" : "已完成整页重审。";
+  } catch (error) {
+    actionStatusEl.textContent = `执行失败：${String(error.message || error)}`;
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function toggleSchedule() {
+  setBusy(true, scheduleEnabled ? "正在关闭自动检查..." : "正在开启每30分钟自动检查...");
+  try {
+    const response = await fetch("/api/toggle-schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: !scheduleEnabled }),
+    });
+    const payload = await response.json();
+    if (!response.ok || !payload.ok) {
+      throw new Error(payload.stderr || payload.stdout || "定时设置失败");
+    }
+    scheduleEnabled = Boolean(payload.schedule_enabled);
+    updateScheduleButton();
+    actionStatusEl.textContent = scheduleEnabled ? "已开启每30分钟自动检查。" : "已关闭自动检查。";
+    if (latestData) {
+      renderSidePanel(latestData);
+    }
+  } catch (error) {
+    actionStatusEl.textContent = `定时设置失败：${String(error.message || error)}`;
+  } finally {
+    setBusy(false);
+  }
+}
+
+function setBusy(busy, text = "") {
+  runCheckBtn.disabled = busy;
+  reviewAllBtn.disabled = busy;
+  scheduleBtn.disabled = busy;
+  if (text) actionStatusEl.textContent = text;
+}
+
+function updateScheduleButton() {
+  scheduleBtn.textContent = scheduleEnabled ? "关闭每30分钟自动检查" : "开启每30分钟自动检查";
 }
 
 function statBox(label, value) {
@@ -207,6 +296,17 @@ function formatCompact(value) {
   if (number >= 1_000_000) return `${(number / 1_000_000).toFixed(1)}M`;
   if (number >= 1_000) return `${(number / 1_000).toFixed(1)}K`;
   return String(Math.round(number));
+}
+
+function formatPercent(value) {
+  const number = Number(value || 0);
+  return `${number.toFixed(number >= 10 ? 1 : 2).replace(/\.0$/, "")}%`;
+}
+
+function formatChange(value, direction) {
+  const number = Number(value || 0);
+  const prefix = direction === "down" ? "-" : "+";
+  return `${prefix}${number.toFixed(number >= 10 ? 1 : 2).replace(/\.0$/, "")}%`;
 }
 
 function escapeHtml(value) {

@@ -200,6 +200,9 @@ class CrossSignalCandidate:
     secondary_category_slug: str = ""
     volume_24h: float = 0.0
     liquidity: float = 0.0
+    current_probability: float = 0.0
+    probability_change_24h: float = 0.0
+    change_direction: str = ""
 
 
 @dataclass(slots=True)

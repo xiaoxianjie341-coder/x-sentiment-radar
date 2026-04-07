@@ -19,6 +19,12 @@
             先看 Polymarket Breaking 的整页事件，再让 Grok 判断 X 上有没有形成真实讨论。
             这是一个热点交叉印证台，不是普通后台。
           </p>
+          <div class="hero-actions">
+            <button id="run-check-btn" class="action-btn action-btn--primary" type="button">立即检查新事件</button>
+            <button id="review-all-btn" class="action-btn" type="button">重审当前整页</button>
+            <button id="schedule-btn" class="action-btn" type="button">开启每30分钟自动检查</button>
+          </div>
+          <p id="action-status" class="hero-status">本地面板已连接。按钮会直接调用本地脚本。</p>
         </div>
         <div class="hero-stats">
           <div class="metric-card">
@@ -74,35 +80,6 @@
             <h3>Quick Actions</h3>
             <div class="compact-list" id="quick-actions"></div>
           </div>
-        </section>
-
-        <section class="panel console-panel">
-          <div class="section-head">
-            <div>
-              <p class="section-kicker">RAW</p>
-              <h2>Debug Snapshot</h2>
-            </div>
-            <span class="section-pill">Ops</span>
-          </div>
-          <div class="console-grid">
-            <div class="console-card">
-              <p class="console-label">Latest JSON</p>
-              <code>/data/cross-signal/latest.json</code>
-            </div>
-            <div class="console-card">
-              <p class="console-label">Seen State</p>
-              <code>/data/cross-signal/seen_candidates.json</code>
-            </div>
-            <div class="console-card">
-              <p class="console-label">Run Command</p>
-              <code>./scripts/run-cross-signal-grok.sh</code>
-            </div>
-            <div class="console-card">
-              <p class="console-label">Cron Install</p>
-              <code>./scripts/install-cross-signal-cron.sh</code>
-            </div>
-          </div>
-          <pre id="raw-preview" class="raw-preview"></pre>
         </section>
       </main>
     </div>
