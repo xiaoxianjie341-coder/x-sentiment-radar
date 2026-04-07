@@ -118,7 +118,17 @@ def _to_candidate_preview(candidate: object) -> CrossSignalCandidate:
 
 def _review_candidate(gate: object, candidate: object) -> CrossSignalReview:
     if hasattr(gate, "review"):
-        return gate.review(candidate)
+        try:
+            return gate.review(candidate)
+        except Exception as exc:  # noqa: BLE001
+            return CrossSignalReview(
+                slug=str(getattr(candidate, "slug", "")).strip(),
+                market_title=str(getattr(candidate, "title", "")).strip(),
+                market_url=str(getattr(candidate, "market_url", "")).strip(),
+                source_label=str(getattr(candidate, "source_label", "")).strip(),
+                is_viral=False,
+                reason_if_not_viral=f"Grok review failed: {exc}",
+            )
 
     alert = gate.evaluate(candidate)
     if alert is None:

@@ -41,43 +41,46 @@
           <div class="section-head">
             <div>
               <p class="section-kicker">LIVE BOARD</p>
-              <h2>Breaking Feed</h2>
+              <h2>Breaking Cards</h2>
             </div>
             <span class="section-pill">Poly</span>
           </div>
+          <p class="board-note">
+            每张卡片都是一个完整事件单元。先看 Poly，再点开卡片看 Grok 对 X 的 review、抓到的帖子和未通过原因。
+          </p>
           <div id="breaking-feed" class="feed-list"></div>
         </section>
 
         <section class="panel verdict-panel">
           <div class="section-head">
             <div>
-              <p class="section-kicker">VERDICT</p>
-              <h2>Grok Review</h2>
+              <p class="section-kicker">CONTROL</p>
+              <h2>How To Read</h2>
             </div>
-            <span class="section-pill">X Search</span>
+            <span class="section-pill">Ops</span>
           </div>
 
           <div class="verdict-block">
-            <h3>New Candidates</h3>
-            <div id="new-candidates" class="compact-list"></div>
+            <h3>Current Sweep</h3>
+            <div class="compact-list" id="sweep-summary"></div>
           </div>
 
           <div class="verdict-block">
-            <h3>Reviewed Candidates</h3>
-            <div id="reviewed-candidates" class="topic-stack"></div>
+            <h3>Status Legend</h3>
+            <div class="compact-list" id="status-legend"></div>
           </div>
 
           <div class="verdict-block">
-            <h3>Passed Topics</h3>
-            <div id="passed-topics" class="topic-stack"></div>
+            <h3>Quick Actions</h3>
+            <div class="compact-list" id="quick-actions"></div>
           </div>
         </section>
 
         <section class="panel console-panel">
           <div class="section-head">
             <div>
-              <p class="section-kicker">CONSOLE</p>
-              <h2>Operator Notes</h2>
+              <p class="section-kicker">RAW</p>
+              <h2>Debug Snapshot</h2>
             </div>
             <span class="section-pill">Ops</span>
           </div>

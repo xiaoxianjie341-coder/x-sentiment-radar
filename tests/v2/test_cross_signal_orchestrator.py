@@ -156,3 +156,21 @@ def test_cross_signal_orchestrator_can_force_review_all_candidates():
     assert report.new_candidate_count == 2
     assert len(report.reviewed_candidates) == 2
     assert gate.calls == ["kitkat-heist-response", "openai-release-gpt6-this-week"]
+
+
+def test_cross_signal_orchestrator_keeps_failure_review_when_gate_errors():
+    class FailingGate:
+        def review(self, candidate):
+            raise RuntimeError("xAI timeout")
+
+    orchestrator = CrossSignalOrchestrator(
+        scout=StubScout([Candidate("kitkat-heist-response", "Will KitKat issue a statement about the heist by April 8?")]),
+        gate=FailingGate(),
+    )
+
+    report = orchestrator.run(review_all=True)
+
+    assert report.passed_count == 0
+    assert len(report.reviewed_candidates) == 1
+    assert report.reviewed_candidates[0].is_viral is False
+    assert "xAI timeout" in report.reviewed_candidates[0].reason_if_not_viral

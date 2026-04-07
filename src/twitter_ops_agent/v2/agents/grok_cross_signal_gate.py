@@ -17,6 +17,7 @@ class XaiSearchConfig:
     base_url: str = "https://api.x.ai/v1"
     reasoning_effort: str = ""
     timeout_seconds: float = 30.0
+    max_retries: int = 1
 
 
 @dataclass(slots=True)
@@ -92,35 +93,40 @@ class GrokCrossSignalGate:
 
 
 def _call_xai(*, config: XaiSearchConfig, system_prompt: str, user_payload: dict[str, object]) -> str:
-    body: dict[str, object] = {
-        "model": config.model,
-        "instructions": system_prompt,
-        "input": json.dumps(user_payload, ensure_ascii=False, indent=2),
-        "tools": [{"type": "x_search"}],
-        "tool_choice": "auto",
-    }
-    if config.reasoning_effort:
-        body["reasoning"] = {"effort": config.reasoning_effort}
+    last_error: Exception | None = None
+    for _ in range(config.max_retries + 1):
+        body: dict[str, object] = {
+            "model": config.model,
+            "instructions": system_prompt,
+            "input": json.dumps(user_payload, ensure_ascii=False, indent=2),
+            "tools": [{"type": "x_search"}],
+            "tool_choice": "auto",
+        }
+        if config.reasoning_effort:
+            body["reasoning"] = {"effort": config.reasoning_effort}
 
-    req = request.Request(
-        build_endpoint(config.base_url, "responses"),
-        data=json.dumps(body).encode("utf-8"),
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {config.api_key}",
-        },
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=config.timeout_seconds) as response:
-            raw = response.read().decode("utf-8")
-    except error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"Grok cross-signal HTTP {exc.code}: {detail}") from exc
-    except error.URLError as exc:
-        raise RuntimeError(f"Grok cross-signal request failed: {exc.reason}") from exc
+        req = request.Request(
+            build_endpoint(config.base_url, "responses"),
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {config.api_key}",
+            },
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, timeout=config.timeout_seconds) as response:
+                raw = response.read().decode("utf-8")
+            return extract_text_from_response(json.loads(raw), api_mode="responses")
+        except error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            last_error = RuntimeError(f"Grok cross-signal HTTP {exc.code}: {detail}")
+        except error.URLError as exc:
+            last_error = RuntimeError(f"Grok cross-signal request failed: {exc.reason}")
+        except TimeoutError as exc:
+            last_error = RuntimeError(f"Grok cross-signal request timed out: {exc}")
 
-    return extract_text_from_response(json.loads(raw), api_mode="responses")
+    raise last_error or RuntimeError("Grok cross-signal request failed")
 
 
 def _parse_gate_output(raw_text: str) -> dict[str, object]:
